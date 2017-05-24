@@ -843,6 +843,7 @@
                   - lambda.amazonaws.com
                   - events.amazonaws.com
                   - s3.amazonaws.com
+                  - cloudformation.amazonaws.com
               Action:
                 - sts:AssumeRole
         Policies:
