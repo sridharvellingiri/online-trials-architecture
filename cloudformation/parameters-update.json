@@ -30,5 +30,9 @@
   {
     "ParameterKey":"OpsWorksGitRepoBranch",
     "UsePreviousValue":true
+  },
+  {
+    "ParameterKey":"MinimumStackCount",
+    "UsePreviousValue":true
   }
 ]
