@@ -15,10 +15,6 @@
             default: Control Architecture Configuration
           Parameters:
             - ControlArchitectureName
-        - Label:
-            default: Lambda Configurations
-          Parameters:
-            - SystemsRole
   Parameters:
     AdminUsername:
       Type: String
@@ -57,42 +53,9 @@
       Description: How long in days before the instance is stopped
       Type: Number
       Default: 14
-    SystemsRole:
-      Description: The arn of the role to access in the systems account to create R53 entries
-      Type: String
-      Default: arn:aws:iam::823267158217:role/OktaAdminRole
-      AllowedValues:
-        - arn:aws:iam::823267158217:role/OktaAdminRole
   Resources:
-    TrialRoute53DomainNameGenIamRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-                  - events.amazonaws.com
-              Action:
-                - sts:AssumeRole
-        Policies:
-          - PolicyName: TrialRoute53DomainNameGenLoggingPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource:
-                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
     TrialRoute53DomainNameGenerator:
       Type: AWS::Lambda::Function
-      DependsOn:
-        - TrialRoute53DomainNameGenIamRole
       Properties:
         Code:
           ZipFile: |
@@ -122,7 +85,8 @@
           Variables:
             days_to_stop: !Ref TrialLifetimeInDays
         Handler: index.handler
-        Role: !GetAtt TrialRoute53DomainNameGenIamRole.Arn
+        Role:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-StandardLoggingRole"
         Runtime: python2.7
         Timeout: 10
     TrialRoute53DomainNameGenCustomResource:
@@ -131,44 +95,8 @@
         - TrialRoute53DomainNameGenerator
       Properties:
         ServiceToken: !GetAtt TrialRoute53DomainNameGenerator.Arn
-    TrialSubnetIdAllocatorIamRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-                  - events.amazonaws.com
-              Action:
-                - sts:AssumeRole
-        Policies:
-          - PolicyName: TrialSubnetIdAllocatorLoggingPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource:
-                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
-          - PolicyName: TrialSubnetIdAllocatorPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - ec2:DescribeSubnets
-                  Resource:
-                    - "*"
     TrialSubnetIdAllocator:
       Type: AWS::Lambda::Function
-      DependsOn:
-        - TrialSubnetIdAllocatorIamRole
       Properties:
         Code:
           ZipFile: |
@@ -204,10 +132,10 @@
         Environment:
           Variables:
             vpc_id:
-              Fn::ImportValue:
-                !Sub "${ControlArchitectureName}-OnlineTrialsVPCId"
+              Fn::ImportValue: !Sub "${ControlArchitectureName}-OnlineTrialsVPCId"
         Handler: index.handler
-        Role: !GetAtt TrialSubnetIdAllocatorIamRole.Arn
+        Role:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-SubnetIdRole"
         Runtime: python2.7
         Timeout: 10
     TrialSubnetIdAllocatorCustomResource:
@@ -392,52 +320,10 @@
                   # Add Suricata and Evebox agent installation, configuration and provisioning
                   # script only accessible from trials VPC
                   curl -s https://s3.amazonaws.com/online-trial-control-ttp/installation-suricata-agent-mode.sh | bash -s --
-    TrialRoute53RecordSetIamRole:
-      Type: AWS::IAM::Role
-      DependsOn:
-        - TrialEc2Instance
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-                  - events.amazonaws.com
-              Action:
-                - sts:AssumeRole
-            - Effect: Allow
-              Principal:
-                AWS:
-                  - !Ref SystemsRole
-              Action:
-                - sts:AssumeRole
-        Policies:
-          - PolicyName: TrialRoute53RecordSetLoggingPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource:
-                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
-          - PolicyName: TrialRoute53RecordSetAccessPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - sts:AssumeRole
-                  Resource:
-                    - !Ref SystemsRole
     TrialRoute53RecordSetHandler:
       Type: AWS::Lambda::Function
       DependsOn:
-        - TrialRoute53RecordSetIamRole
+        - TrialEc2Instance
       Properties:
         Code:
           ZipFile: |
@@ -492,9 +378,11 @@
             hosted_zone_id: Z2KYYIWHSJMSS1
             name: !GetAtt TrialRoute53DomainNameGenCustomResource.DomainName
             public_ip: !GetAtt TrialEc2Instance.PublicIp
-            role: !Ref SystemsRole
+            role:
+              Fn::ImportValue: !Sub "${ControlArchitectureName}-SystemsIAMRole"
         Handler: index.handler
-        Role: !GetAtt TrialRoute53RecordSetIamRole.Arn
+        Role:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-Route53Role"
         Runtime: python2.7
         Timeout: 30
     TrialRoute53RecordSetCustomResource:
@@ -503,47 +391,10 @@
         - TrialRoute53RecordSetHandler
       Properties:
         ServiceToken: !GetAtt TrialRoute53RecordSetHandler.Arn
-    TrialOpsWorkRegisterHandlerIamRole:
-      Type: AWS::IAM::Role
-      DependsOn:
-        - TrialEc2Instance
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-                  - events.amazonaws.com
-              Action:
-                - sts:AssumeRole
-        Policies:
-          - PolicyName: TrialOpsWorksRegisterLoggingPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource:
-                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
-          - PolicyName: TrialOpsWorkRegisterHandlerPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - opsworks:DescribeInstances
-                    - opsworks:DeregisterInstance
-                  Resource:
-                    - "*"
     TrialOpsWorksRegisterHandler:
       Type: AWS::Lambda::Function
       DependsOn:
-        - TrialOpsWorkRegisterHandlerIamRole
+        - TrialEc2Instance
       Properties:
         Code:
           ZipFile: |
@@ -587,7 +438,8 @@
             stack_id:
               Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksStackId
         Handler: index.handler
-        Role: !GetAtt TrialOpsWorkRegisterHandlerIamRole.Arn
+        Role:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksRegisterRole"
         Runtime: python2.7
         Timeout: 30
     TrialOpsWorksRegisterHandlerCustomResource:
@@ -596,46 +448,10 @@
         - TrialOpsWorksRegisterHandler
       Properties:
         ServiceToken: !GetAtt TrialOpsWorksRegisterHandler.Arn
-    TrialOpsWorksInitialiseInstanceCookbooksIamRole:
-      Type: AWS::IAM::Role
-      DependsOn:
-        - TrialEc2Instance
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: 2012-10-17
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - lambda.amazonaws.com
-                  - events.amazonaws.com
-              Action:
-                - sts:AssumeRole
-        Policies:
-          - PolicyName: TrialOpsWorksInitInstanceCookbookLoggingPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:PutLogEvents
-                  Resource:
-                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
-          - PolicyName: TrialOpsWorksInitInstanceCookbookPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - opsworks:CreateDeployment
-                  Resource:
-                    - "*"
     TrialOpsWorksInitInstanceCookbookHandler:
       Type: AWS::Lambda::Function
       DependsOn:
-        - TrialOpsWorksInitialiseInstanceCookbooksIamRole
+        - TrialEc2Instance
       Properties:
         Code:
           ZipFile: |
@@ -671,7 +487,8 @@
               Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksStackId"
             instance_id: !GetAtt TrialOpsWorksRegisterHandlerCustomResource.InstanceId
         Handler: index.handler
-        Role: !GetAtt TrialOpsWorksInitialiseInstanceCookbooksIamRole.Arn
+        Role:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksCookbookRole"
         Runtime: python2.7
         Timeout: 10
     TrialOpsWorksInitInstanceCookbookCustomResource:

@@ -101,6 +101,12 @@
       AllowedValues:
         - test
         - prod
+    SystemsRole:
+      Description: The arn of the role to access in the systems account to create R53 entries
+      Type: String
+      Default: arn:aws:iam::823267158217:role/OktaAdminRole
+      AllowedValues:
+        - arn:aws:iam::823267158217:role/OktaAdminRole
     UpdatedTime:
       Type: String
       Description: The time in ms that this stack was updated
@@ -1290,6 +1296,175 @@
         Role: !GetAtt OnlineTrialLambdaUpdaterIamProfile.Arn
         Runtime: python2.7
         Timeout: 10
+    # These resources are created but used by the stacks, not the control system itself
+    TrialRoute53DomainNameGenIamRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - events.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: TrialRoute53DomainNameGenLoggingPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+    TrialSubnetIdAllocatorIamRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - events.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: TrialSubnetIdAllocatorLoggingPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+          - PolicyName: TrialSubnetIdAllocatorPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ec2:DescribeSubnets
+                  Resource:
+                    - "*"
+    TrialRoute53RecordSetIamRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - events.amazonaws.com
+              Action:
+                - sts:AssumeRole
+            - Effect: Allow
+              Principal:
+                AWS:
+                  - !Ref SystemsRole
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: TrialRoute53RecordSetLoggingPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+          - PolicyName: TrialRoute53RecordSetAccessPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - sts:AssumeRole
+                  Resource:
+                    - !Ref SystemsRole
+    TrialOpsWorkRegisterHandlerIamRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - events.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: TrialOpsWorksRegisterLoggingPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+          - PolicyName: TrialOpsWorkRegisterHandlerPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - opsworks:DescribeInstances
+                    - opsworks:DeregisterInstance
+                  Resource:
+                    - "*"
+    TrialOpsWorksInitialiseInstanceCookbooksIamRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - lambda.amazonaws.com
+                  - events.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: TrialOpsWorksInitInstanceCookbookLoggingPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource:
+                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
+          - PolicyName: TrialOpsWorksInitInstanceCookbookPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - opsworks:CreateDeployment
+                  Resource:
+                    - "*"
   Outputs:
     DistributionName:
       Description: The CloudFront distribution name to point a R53 entry to.
@@ -1328,3 +1503,34 @@
       Value: !Ref OpsWorksLayerSecurityGroups
       Export:
         Name: !Sub "${AWS::StackName}-OpsWorksLayerSecurityGroups"
+    StandardLoggingRole:
+      Description: IAM Role ARN to be used by Lambdas simply for logging
+      Value: !GetAtt TrialRoute53DomainNameGenIamRole.Arn
+      Export:
+        Name: !Sub "${AWS::StackName}-StandardLoggingRole"
+    SubnetIdRole:
+      Description: IAM Role ARN to be used by a Lambda to choose a subnet
+      Value: !GetAtt TrialSubnetIdAllocatorIamRole.Arn
+      Export:
+        Name: !Sub "${AWS::StackName}-SubnetIdRole"
+    Route53Role:
+      Description: IAM Role ARN to be used to create R53 record sets
+      Value: !GetAtt TrialRoute53RecordSetIamRole.Arn
+      Export:
+        Name: !Sub "${AWS::StackName}-Route53Role"
+    SystemsIAMRole:
+      Description: IAM Role ARN to be used for Cross Account access
+      Value: !Ref SystemsRole
+      Export:
+        Name: !Sub "${AWS::StackName}-SystemsIAMRole"
+    OpsWorksRegisterRole:
+      Description: IAM Role ARN to be used to deregister instances to OpsWorks
+      Value: !GetAtt TrialOpsWorkRegisterHandlerIamRole.Arn
+      Export:
+        Name: !Sub "${AWS::StackName}-OpsWorksRegisterRole"
+    OpsWorksCookbookRole:
+      Description: IAM Role ARN to be used to update custom cookbooks on each instance
+      Value: !GetAtt TrialOpsWorksInitialiseInstanceCookbooksIamRole.Arn
+      Export:
+        Name: !Sub "${AWS::StackName}-OpsWorksCookbookRole"
+        
