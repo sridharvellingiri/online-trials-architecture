@@ -10,7 +10,6 @@
             - TrialAMIId
             - TrialInstanceType
             - TrialSSHKey
-            - TrialLifetimeInDays
         - Label:
             default: Control Architecture Configuration
           Parameters:
@@ -31,7 +30,7 @@
     TrialAMIId:
       Description: The AMI Id of the Trial Image
       Type: AWS::EC2::Image::Id
-      Default: ami-fd5425eb
+      Default: ami-e8b6fdfe
       MinLength: 1
     TrialInstanceType:
       Description: The type of EC2 instance to deploy the AMI to
@@ -49,101 +48,17 @@
       Description: The name of an existing EC2 KeyPair
       Type: AWS::EC2::KeyPair::KeyName
       Default: salty-trials
-    TrialLifetimeInDays:
-      Description: How long in days before the instance is stopped
-      Type: Number
-      Default: 14
   Resources:
-    TrialRoute53DomainNameGenerator:
-      Type: AWS::Lambda::Function
-      Properties:
-        Code:
-          ZipFile: |
-            from __future__ import print_function
-            from datetime import datetime, timedelta
-            import os
-            import cfnresponse
-            import random
-            import string
-
-            def handler(event, context):
-              try:
-                if event['RequestType'] == 'Create':
-                  name = ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(6))
-                  responseData = {}
-                  responseData['DomainName'] = name
-                  d = datetime.today() + timedelta(days=int(os.environ['days_to_stop']))
-                  responseData['ExpiryDate'] = d.date().strftime('%d-%m-%Y')
-                  print(responseData)
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData)
-                else:
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-              except Exception as err:
-                print("{}\n".format(err))
-                cfnresponse.send(event, context, cfnresponse.FAILED, {})
-        Environment:
-          Variables:
-            days_to_stop: !Ref TrialLifetimeInDays
-        Handler: index.handler
-        Role:
-          Fn::ImportValue: !Sub "${ControlArchitectureName}-StandardLoggingRole"
-        Runtime: python2.7
-        Timeout: 10
     TrialRoute53DomainNameGenCustomResource:
       Type: Custom::DomainName
-      DependsOn:
-        - TrialRoute53DomainNameGenerator
       Properties:
-        ServiceToken: !GetAtt TrialRoute53DomainNameGenerator.Arn
-    TrialSubnetIdAllocator:
-      Type: AWS::Lambda::Function
-      Properties:
-        Code:
-          ZipFile: |
-            from __future__ import print_function
-            import cfnresponse
-            import os
-            import boto3
-            import random
-
-            def handler(event, context):
-              client = boto3.client('ec2')
-              try:
-                if event['RequestType'] == 'Create':
-                  response = client.describe_subnets(
-                    Filters=[{
-                        'Name': 'vpc-id',
-                        'Values': [os.environ['vpc_id']]
-                      }
-                    ]
-                  )
-
-                  subnets = []
-                  for subnet in response['Subnets']:
-                    print("Adding {} to subnet list".format(subnet['SubnetId']))
-                    subnets.append(subnet['SubnetId'])
-
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {'SubnetId' : random.choice(subnets)})
-                else:
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-              except Exception as err:
-                print("{}\n".format(err))
-                cfnresponse.send(event, context, cfnresponse.FAILED, {})
-        Environment:
-          Variables:
-            vpc_id:
-              Fn::ImportValue: !Sub "${ControlArchitectureName}-OnlineTrialsVPCId"
-        Handler: index.handler
-        Role:
-          Fn::ImportValue: !Sub "${ControlArchitectureName}-SubnetIdRole"
-        Runtime: python2.7
-        Timeout: 10
+        ServiceToken:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-DomainNameGenerator"
     TrialSubnetIdAllocatorCustomResource:
       Type: Custom::GetSubnetId
-      DependsOn:
-        - TrialSubnetIdAllocator
       Properties:
-        ServiceToken: !GetAtt TrialSubnetIdAllocator.Arn
+        ServiceToken:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-SubnetAllocator"
     TrialEc2Instance:
       Type: AWS::EC2::Instance
       CreationPolicy:
@@ -320,183 +235,29 @@
                   # Add Suricata and Evebox agent installation, configuration and provisioning
                   # script only accessible from trials VPC
                   # curl -s https://s3.amazonaws.com/online-trial-control-ttp/installation-suricata-agent-mode.sh | bash -s --
-    TrialRoute53RecordSetHandler:
-      Type: AWS::Lambda::Function
-      DependsOn:
-        - TrialEc2Instance
-      Properties:
-        Code:
-          ZipFile: |
-            from __future__ import print_function
-            import cfnresponse
-            import os
-            import boto3
-
-            def handler(event, context):
-              try:
-                sts = boto3.client('sts')
-                role = sts.assume_role(
-                  RoleArn=os.environ['role'],
-                  RoleSessionName=os.environ['name']
-                )
-                print("Role Assumed OK")
-                client = boto3.client(
-                  'route53',
-                  aws_access_key_id=role['Credentials']['AccessKeyId'],
-                  aws_secret_access_key=role['Credentials']['SecretAccessKey'],
-                  aws_session_token=role['Credentials']['SessionToken']
-                )
-                print("Cross account R53 client created OK")
-                action = 'DELETE' if event['RequestType'] == 'Delete' else 'UPSERT'
-                requestData = {
-                  'Changes': [
-                    {
-                      'Action': action,
-                      'ResourceRecordSet': {
-                        'Name': "{}.trial.alfresco.com.".format(os.environ['name']),
-                        'Type': 'A',
-                        'TTL': 300,
-                        'ResourceRecords': [
-                          {
-                            'Value': os.environ['public_ip']
-                          }
-                        ]
-                      }
-                    }
-                  ]
-                }
-                response = client.change_resource_record_sets(
-                  HostedZoneId=os.environ['hosted_zone_id'],
-                  ChangeBatch=requestData
-                )
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-              except Exception as err:
-                print("{}\n".format(err))
-                cfnresponse.send(event, context, cfnresponse.FAILED, {})
-        Environment:
-          Variables:
-            hosted_zone_id: Z2KYYIWHSJMSS1
-            name: !GetAtt TrialRoute53DomainNameGenCustomResource.DomainName
-            public_ip: !GetAtt TrialEc2Instance.PublicIp
-            role:
-              Fn::ImportValue: !Sub "${ControlArchitectureName}-SystemsIAMRole"
-        Handler: index.handler
-        Role:
-          Fn::ImportValue: !Sub "${ControlArchitectureName}-Route53Role"
-        Runtime: python2.7
-        Timeout: 30
     TrialRoute53RecordSetCustomResource:
       Type: Custom::CreateRecordSet
       DependsOn:
-        - TrialRoute53RecordSetHandler
-      Properties:
-        ServiceToken: !GetAtt TrialRoute53RecordSetHandler.Arn
-    TrialOpsWorksRegisterHandler:
-      Type: AWS::Lambda::Function
-      DependsOn:
         - TrialEc2Instance
       Properties:
-        Code:
-          ZipFile: |
-            from __future__ import print_function
-            import cfnresponse
-            import os
-            import boto3
-
-            def handler(event, context):
-              try:
-                client = boto3.client('opsworks')
-                eventType = event['RequestType']
-                if eventType == 'Create' or eventType == 'Delete':
-                  response = client.describe_instances(
-                    StackId=os.environ['stack_id']
-                  )
-                  data = {}
-                  for instance in response['Instances']:
-                    if instance['Hostname'] == os.environ['hostname']:
-                      print("Instance found - {}".format(instance['InstanceId']))
-                      if eventType == 'Create':
-                        data['InstanceId'] = instance['InstanceId']
-                        cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
-                        break
-                      elif eventType == 'Delete':
-                        deregisterResp = client.deregister_instance(
-                          InstanceId=instance['InstanceId']
-                        )
-                        print("Instance deregistered from stack")
-                        cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
-                        break
-                      
-                else:
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-              except Exception as err:
-                print("{}\n".format(err))
-                cfnresponse.send(event, context, cfnresponse.FAILED, {})
-        Environment:
-          Variables:
-            hostname: !GetAtt TrialRoute53DomainNameGenCustomResource.DomainName
-            stack_id:
-              Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksStackId
-        Handler: index.handler
-        Role:
-          Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksRegisterRole"
-        Runtime: python2.7
-        Timeout: 30
+        ServiceToken:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-RecordSetCreator"
+        Name: !GetAtt TrialRoute53DomainNameGenCustomResource.DomainName
+        PublicIp: !GetAtt TrialEc2Instance.PublicIp
     TrialOpsWorksRegisterHandlerCustomResource:
       Type: Custom::OpsWorksRegister
       DependsOn:
-        - TrialOpsWorksRegisterHandler
-      Properties:
-        ServiceToken: !GetAtt TrialOpsWorksRegisterHandler.Arn
-    TrialOpsWorksInitInstanceCookbookHandler:
-      Type: AWS::Lambda::Function
-      DependsOn:
         - TrialEc2Instance
       Properties:
-        Code:
-          ZipFile: |
-            from __future__ import print_function
-            import cfnresponse
-            import os
-            import boto3
-
-            def handler(event, context):
-              try:
-                if event['RequestType'] == 'Create':
-                  client = boto3.client('opsworks')
-                  response = client.create_deployment(
-                    StackId=os.environ['stack_id'],
-                    InstanceIds=[
-                      os.environ['instance_id']
-                    ],
-                    Command={
-                      'Name': 'update_custom_cookbooks'
-                    },
-                    Comment="Updating cookbooks on {}".format(os.environ['instance_id'])
-                  )
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response)
-                else:
-                  print("Event is {}, doing nothing".format(event['RequestType']))
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-              except Exception as err:
-                print("{}\n".format(err))
-                cfnresponse.send(event, context, cfnresponse.FAILED, {})
-        Environment:
-          Variables:
-            stack_id:
-              Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksStackId"
-            instance_id: !GetAtt TrialOpsWorksRegisterHandlerCustomResource.InstanceId
-        Handler: index.handler
-        Role:
-          Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksCookbookRole"
-        Runtime: python2.7
-        Timeout: 10
+        ServiceToken:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorkRegister"
+        Hostname: !GetAtt TrialRoute53DomainNameGenCustomResource.DomainName
     TrialOpsWorksInitInstanceCookbookCustomResource:
       Type: Custom::OpsWorksCookbookInstaller
-      DependsOn:
-        - TrialOpsWorksInitInstanceCookbookHandler
       Properties:
-        ServiceToken: !GetAtt TrialOpsWorksInitInstanceCookbookHandler.Arn
+        ServiceToken:
+          Fn::ImportValue: !Sub "${ControlArchitectureName}-CookbookRunner"
+        InstanceId: !GetAtt TrialOpsWorksRegisterHandlerCustomResource.InstanceId
   Outputs:
     Type:
       Description: The type of stack this is.
