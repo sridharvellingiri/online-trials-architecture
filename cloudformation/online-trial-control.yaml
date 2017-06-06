@@ -787,9 +787,10 @@
               Statement:
                 - Effect: Allow
                   Action:
-                    - ec2:TerminateInstances
+                    - opsworks:StopInstance
+                    - opsworks:DescribeInstances
                   Resource:
-                    - !Sub "arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:instance/*"
+                    - "*"
     OnlineTrialLifecycleHandler:
       Type: AWS::Lambda::Function
       DependsOn:
@@ -803,6 +804,7 @@
             stack_type: Trial
             stage: !Ref Stage
             days_to_stop: !Ref DaysToStop
+            layer_id: !Ref OnlineTrialOpsWorksAlfrescoLayer
         FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "TrialLifecycleHandler-${Stage}"]
         Handler: triallifecycle.handler
         MemorySize: 512
