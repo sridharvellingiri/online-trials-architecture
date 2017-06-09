@@ -149,7 +149,7 @@
                 - Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksStackId
                 - "\n"
                 - "aws opsworks register --stack-id ${opsworks_stackid}"
-                - !Sub " --infrastructure-class ec2 --region ${AWS::Region} --local"
+                - !Sub " --infrastructure-class ec2 --region ${AWS::Region} --local --use-instance-profile"
                 - "\n"
                 - !Sub |
                   else
