@@ -43,7 +43,7 @@ logInfo "Waiting for the change set to be created...."
 STATUS=$(aws cloudformation describe-change-set --stack-name $STACK_NAME --change-set-name $CHANGE_SET_NAME --query "Status" --output text)
 while [ "$STATUS" == "CREATE_IN_PROGRESS" ]
 do
-  sleep 10
+  sleep 30
   logInfo "Waiting for the change set to be created...."
   STATUS=$(aws cloudformation describe-change-set --stack-name $STACK_NAME --change-set-name $CHANGE_SET_NAME --query "Status" --output text)
 done
