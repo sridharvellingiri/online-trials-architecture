@@ -812,7 +812,7 @@
         MemorySize: 512
         Role: !GetAtt OnlineTrialLifecycleIamRole.Arn
         Runtime: python2.7
-        Timeout: 90
+        Timeout: 180
     OnlineTrialLifecycleScheduleRule:
       Type: AWS::Events::Rule
       DependsOn:
@@ -1575,7 +1575,7 @@
                 - Effect: Allow
                   Action:
                     - opsworks:DescribeInstances
-                    - opsworks:DeregisterInstance
+                    - opsworks:DeleteInstance
                   Resource:
                     - "*"
     TrialOpsWorksRegisterHandler:
@@ -1591,29 +1591,23 @@
             def handler(event, context):
               try:
                 client = boto3.client('opsworks')
-                eventType = event['RequestType']
-                if eventType == 'Create' or eventType == 'Delete':
-                  response = client.describe_instances(
-                    StackId=os.environ['stack_id']
-                  )
-                  data = {}
-                  for instance in response['Instances']:
-                    if instance['Hostname'] == event['ResourceProperties']['Hostname']:
-                      print("Instance found - {}".format(instance['InstanceId']))
-                      if eventType == 'Create':
-                        data['InstanceId'] = instance['InstanceId']
-                        cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
-                        break
-                      elif eventType == 'Delete':
-                        deregisterResp = client.deregister_instance(
-                          InstanceId=instance['InstanceId']
-                        )
-                        print("Instance deregistered from stack")
-                        cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
-                        break
-                      
-                else:
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                print(event)
+                response = client.describe_instances(
+                  StackId=os.environ['stack_id']
+                )
+                data = {}
+                for instance in response['Instances']:
+                  if instance['Hostname'] == event['ResourceProperties']['Hostname']:
+                    print("Instance found - {}".format(instance['InstanceId']))
+                    if event['RequestType'] == 'Create':
+                      data['InstanceId'] = instance['InstanceId']
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
+                      break
+                    elif event['RequestType'] == 'Delete':
+                      client.delete_instance(InstanceId=instance['InstanceId'])
+                      print("Instance deleted from stack")
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
+                      break
               except Exception as err:
                 print("{}\n".format(err))
                 cfnresponse.send(event, context, cfnresponse.FAILED, {})
