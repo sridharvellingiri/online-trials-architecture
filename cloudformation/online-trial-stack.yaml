@@ -235,15 +235,6 @@
                   # Add Suricata and Evebox agent installation, configuration and provisioning
                   # script only accessible from trials VPC
                   # curl -s https://s3.amazonaws.com/online-trial-control-ttp/installation-suricata-agent-mode.sh | bash -s --
-    TrialRoute53RecordSetCustomResource:
-      Type: Custom::CreateRecordSet
-      DependsOn:
-        - TrialEc2Instance
-      Properties:
-        ServiceToken:
-          Fn::ImportValue: !Sub "${ControlArchitectureName}-RecordSetCreator"
-        Name: !GetAtt TrialRoute53DomainNameGenCustomResource.DomainName
-        PublicIp: !GetAtt TrialEc2Instance.PublicIp
     TrialOpsWorksRegisterHandlerCustomResource:
       Type: Custom::OpsWorksRegister
       DependsOn:
