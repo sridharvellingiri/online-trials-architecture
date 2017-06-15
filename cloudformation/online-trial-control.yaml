@@ -247,8 +247,6 @@
             Id: !Ref OnlineTrialAssignUserHandler
     OnlineTrialAssignUserInvokePermission:
       Type: AWS::Lambda::Permission
-      DependsOn:
-        - OnlineTrialAssignUserScheduleRule
       Properties:
         FunctionName: !Ref OnlineTrialAssignUserHandler
         Action: lambda:InvokeFunction
@@ -416,8 +414,6 @@
             Id: !Ref OnlineTrialFulfillmentHandler
     OnlineTrialFulfillmentInvokePermission:
       Type: AWS::Lambda::Permission
-      DependsOn:
-        - OnlineTrialFulfillmentScheduleRule
       Properties:
         FunctionName: !Ref OnlineTrialFulfillmentHandler
         Action: lambda:InvokeFunction
@@ -514,8 +510,6 @@
             Id: !Ref OnlineTrialInstanceRequestHandler
     OnlineTrialInstanceRequestInvokePermission:
       Type: AWS::Lambda::Permission
-      DependsOn:
-        - OnlineTrialInstanceRequestScheduleRule
       Properties:
         FunctionName: !Ref OnlineTrialInstanceRequestHandler
         Action: lambda:InvokeFunction
@@ -533,8 +527,6 @@
             Protocol: lambda
     OnlineTrialRequestHandlerInvokePermission:
         Type: AWS::Lambda::Permission
-        DependsOn:
-          - OnlineTrialRequestSNSTopic
         Properties:
           Action: lambda:InvokeFunction
           FunctionName: !Ref OnlineTrialRequestHandler
@@ -827,8 +819,6 @@
             Id: !Ref OnlineTrialLifecycleHandler
     OnlineTrialLifecycleInvokePermission:
       Type: AWS::Lambda::Permission
-      DependsOn:
-        - OnlineTrialLifecycleScheduleRule
       Properties:
         Action: lambda:InvokeFunction
         FunctionName: !Ref OnlineTrialLifecycleHandler
@@ -975,8 +965,6 @@
             Id: !Ref OnlineTrialScheduledStackBuilder
     OnlineTrialStackBuilderInvokePermission:
       Type: AWS::Lambda::Permission
-      DependsOn:
-        - OnlineTrialStackBuilderScheduleRule
       Properties:
         Action: lambda:InvokeFunction
         FunctionName: !Ref OnlineTrialScheduledStackBuilder
@@ -1483,13 +1471,21 @@
                     - sts:AssumeRole
                   Resource:
                     - !Ref SystemsRole
+          - PolicyName: TrialRoute53RecordsSetEc2AccessPolicy
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ec2:DescribeInstances
+                  Resource:
+                    - "*"
     TrialRoute53RecordSetHandler:
       Type: AWS::Lambda::Function
       Properties:
         Code:
           ZipFile: |
             from __future__ import print_function
-            import cfnresponse
             import os
             import boto3
 
@@ -1498,9 +1494,9 @@
                 sts = boto3.client('sts')
                 role = sts.assume_role(
                   RoleArn=os.environ['role'],
-                  RoleSessionName=event['ResourceProperties']['Name']
+                  RoleSessionName=event['id']
                 )
-                print("Role Assumed OK")
+                print("Role Assumed OK")	
                 client = boto3.client(
                   'route53',
                   aws_access_key_id=role['Credentials']['AccessKeyId'],
@@ -1508,41 +1504,87 @@
                   aws_session_token=role['Credentials']['SessionToken']
                 )
                 print("Cross account R53 client created OK")
-                action = 'DELETE' if event['RequestType'] == 'Delete' else 'UPSERT'
+
+                action = 'DELETE' if event['detail']['state'] == 'shutting-down' else 'UPSERT'
+                ec2 = boto3.client('ec2')
+                data = ec2.describe_instances(InstanceIds=[event['detail']['instance-id']])
+                name = None
+                for instance in data['Reservations'][0]['Instances']:
+                  public_ip = instance['PublicIpAddress'] if 'PublicIpAddress' in instance else None
+                  if 'Tags' in instance:
+                    for tag in instance['Tags']:
+                      if tag['Key'] == 'Name':
+                        if 'trial' not in tag['Value']:
+                          print("{} is not a trial instance".format(tag['Value']))
+                          return 'SUCCESS'
+                        name = tag['Value'].split('.')[0]
+                      elif tag['Key'] == 'Stage':
+                        if tag['Value'] != os.environ['stage']:
+                          print("Ignoring {}, not on the same stage".format(event['detail']['instance-id']))
+                          return 'SUCCESS'
+                print("action: {}, name: {}, ip: {}".format(action, name, public_ip))
+
+                if not name:
+                  return 'FAILURE'
+                
                 requestData = {
                   'Changes': [
                     {
                       'Action': action,
                       'ResourceRecordSet': {
-                        'Name': "{}.trial.alfresco.com.".format(event['ResourceProperties']['Name']),
+                        'Name': "{}.trial.alfresco.com.".format(name),
                         'Type': 'A',
                         'TTL': 300,
-                        'ResourceRecords': [
-                          {
-                            'Value': event['ResourceProperties']['PublicIp']
-                          }
-                        ]
                       }
                     }
                   ]
                 }
+                if len(public_ip) > 0:
+                  requestData['Changes'][0]['ResourceRecordSet']['ResourceRecords'] = [{'Value': public_ip}]
                 response = client.change_resource_record_sets(
                   HostedZoneId=os.environ['hosted_zone_id'],
                   ChangeBatch=requestData
                 )
-                cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                return 'SUCCESS'
               except Exception as err:
                 print("{}\n".format(err))
-                cfnresponse.send(event, context, cfnresponse.FAILED, {})
+                return 'FAILURE'
         Environment:
           Variables:
             hosted_zone_id: Z2KYYIWHSJMSS1
             role: !Ref SystemsRole
+            stage: !Ref Stage
         FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "RecordSetCreator-${Stage}"]
         Handler: index.handler
         Role: !GetAtt TrialRoute53RecordSetIamRole.Arn
         Runtime: python2.7
         Timeout: 30
+    Ec2InstanceStateChangeRule:
+      Type: AWS::Events::Rule
+      DependsOn:
+        - TrialRoute53RecordSetHandler
+      Properties:
+        Description: Upserts/Deletes R53 entries if the state of the instances change to running or shutting-down
+        EventPattern:
+          source:
+            - aws.ec2
+          detail-type:
+            - EC2 Instance State-change Notification
+          detail:
+            state:
+              - running
+              - shutting-down
+        State: ENABLED
+        Targets:
+          - Arn: !GetAtt TrialRoute53RecordSetHandler.Arn
+            Id: !Ref TrialRoute53RecordSetHandler
+    PermissionForEc2StateChangeToInvokeLambda:
+      Type: AWS::Lambda::Permission
+      Properties:
+        FunctionName: !Ref TrialRoute53RecordSetHandler
+        Action: lambda:InvokeFunction
+        Principal: events.amazonaws.com
+        SourceArn: !GetAtt Ec2InstanceStateChangeRule.Arn
     TrialOpsWorkRegisterHandlerIamRole:
       Type: AWS::IAM::Role
       Properties:
