@@ -1576,6 +1576,7 @@
                   Action:
                     - opsworks:DescribeInstances
                     - opsworks:DeleteInstance
+                    - opsworks:DeregisterInstance
                   Resource:
                     - "*"
     TrialOpsWorksRegisterHandler:
@@ -1591,10 +1592,7 @@
             def handler(event, context):
               try:
                 client = boto3.client('opsworks')
-                print(event)
-                response = client.describe_instances(
-                  StackId=os.environ['stack_id']
-                )
+                response = client.describe_instances(StackId=os.environ['stack_id'])
                 data = {}
                 for instance in response['Instances']:
                   if instance['Hostname'] == event['ResourceProperties']['Hostname']:
@@ -1604,8 +1602,14 @@
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
                       break
                     elif event['RequestType'] == 'Delete':
-                      client.delete_instance(InstanceId=instance['InstanceId'])
-                      print("Instance deleted from stack")
+                      # Is the instance stopped or online?
+                      # stopped = delete, online = deregister
+                      if instance['Status'] == 'online':
+                        client.deregister_instance(InstanceId=instance['InstanceId'])
+                      elif instance['Status'] == 'stopped':
+                        client.delete_instance(InstanceId=instance['InstanceId'])
+                      
+                      print("Instance removed from stack")
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
                       break
               except Exception as err:
