@@ -1488,6 +1488,7 @@
             from __future__ import print_function
             import os
             import boto3
+            from botocore.exceptions import ClientError
             import cfnresponse
 
             def handler(event, context):
@@ -1546,7 +1547,7 @@
                     }
                   ]
                 }
-                if len(public_ip) > 0:
+                if public_ip and len(public_ip) > 0:
                   requestData['Changes'][0]['ResourceRecordSet']['ResourceRecords'] = [{'Value': public_ip}]
                 response = client.change_resource_record_sets(
                   HostedZoneId=os.environ['hosted_zone_id'],
@@ -1555,6 +1556,17 @@
                 if 'RequestType' in event:
                   cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
                 return 'SUCCESS'
+              except ClientError as e:
+                if e.response['Error']['Code'] == 'InvalidChangeBatch':
+                  print("Could not delete record. Please delete it manually")
+                  if 'RequestType' in event:
+                    cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+                  return 'SUCCESS'
+                else:
+                  print("{}".format(e.response['Error']['Message']))
+                  if 'RequestType' in event:
+                    cfnresponse.send(event, context, cfnresponse.FAILED, {})
+                  return 'FAILURE'
               except Exception as err:
                 print("{}\n".format(err))
                 if 'RequestType' in event:
