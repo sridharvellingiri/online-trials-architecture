@@ -341,6 +341,18 @@
             KeyType: HASH
           - AttributeName: Date
             KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: LeadsByDateGSI
+            KeySchema:
+              - AttributeName: Date
+                KeyType: HASH
+            Projection:
+              NonKeyAttributes:
+                - UserDetails
+              ProjectionType: "INCLUDE"
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
         ProvisionedThroughput:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
