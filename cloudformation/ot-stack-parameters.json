@@ -6,9 +6,5 @@
   {
     "ParameterKey":"AdminPassword",
     "ParameterValue":"@@PASSWORD@@"
-  },
-  {
-    "ParameterKey":"TrialAMIId",
-    "ParameterValue":"@@AMI_ID@@"
   }
 ]
