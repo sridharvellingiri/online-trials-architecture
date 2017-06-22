@@ -1689,7 +1689,6 @@
                     if event['RequestType'] == 'Create':
                       data['InstanceId'] = instance['InstanceId']
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
-                      break
                     elif event['RequestType'] == 'Delete':
                       # Is the instance stopped or online?
                       # stopped = delete, online = deregister
@@ -1700,7 +1699,6 @@
                       
                       print("Instance removed from stack")
                       cfnresponse.send(event, context, cfnresponse.SUCCESS, data)
-                      break
               except Exception as err:
                 print("{}\n".format(err))
                 cfnresponse.send(event, context, cfnresponse.FAILED, {})
