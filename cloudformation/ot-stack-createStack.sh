@@ -41,8 +41,7 @@ else
   logInfo "Replacing placeholders in ot-stack-parameters.json"
   sed -i'.bak' "
       s/@@USERNAME@@/$USER_NAME/g;
-      s/@@PASSWORD@@/$USER_PWD/g;
-      s/@@AMI_ID@@/$4/g
+      s/@@PASSWORD@@/$USER_PWD/g
   " ot-stack-parameters.json
 
   # Validate the template
