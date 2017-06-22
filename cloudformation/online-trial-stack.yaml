@@ -7,9 +7,7 @@
         - Label:
             default: Trial Environment Configuration
           Parameters:
-            - TrialAMIId
             - TrialInstanceType
-            - TrialSSHKey
         - Label:
             default: Control Architecture Configuration
           Parameters:
@@ -27,11 +25,6 @@
       Type: String
       MinLength: 1
       Default: online-trial-control-test
-    TrialAMIId:
-      Description: The AMI Id of the Trial Image
-      Type: AWS::EC2::Image::Id
-      Default: ami-e8b6fdfe
-      MinLength: 1
     TrialInstanceType:
       Description: The type of EC2 instance to deploy the AMI to
       Type: String
@@ -44,10 +37,17 @@
         - m4.xlarge
         - m4.2xlarge
         - m4.4xlarge
-    TrialSSHKey:
-      Description: The name of an existing EC2 KeyPair
-      Type: AWS::EC2::KeyPair::KeyName
-      Default: salty-trials
+  Mappings:
+    sshkey:
+      us-east-1:
+        name: salty-trials
+      eu-west-1:
+        name: trials-dr-key
+    ami:
+      us-east-1:
+        id: ami-e8b6fdfe
+      eu-west-1:
+        id: ami-ef9a8289
   Resources:
     TrialRoute53DomainNameGenCustomResource:
       Type: Custom::DomainName
@@ -67,9 +67,9 @@
           Count: 1
       Properties:
         IamInstanceProfile: aws-opsworks-ec2-role
-        ImageId: !Ref TrialAMIId
+        ImageId: !FindInMap [ami, !Ref "AWS::Region", id]
         InstanceType: !Ref TrialInstanceType
-        KeyName: !Ref TrialSSHKey
+        KeyName: !FindInMap [sshkey, !Ref "AWS::Region", name]
         SecurityGroupIds:
           - Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksLayerSecurityGroups"
         SourceDestCheck: true
@@ -149,7 +149,7 @@
                 - Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksStackId
                 - "\n"
                 - "aws opsworks register --stack-id ${opsworks_stackid}"
-                - !Sub " --infrastructure-class ec2 --region ${AWS::Region} --local --use-instance-profile"
+                - !Sub " --infrastructure-class ec2 --region us-east-1 --local --use-instance-profile"
                 - "\n"
                 - !Sub |
                   else
@@ -208,19 +208,19 @@
                   if [[ "$RESULT" == 0 ]]; then
                   # make sure the status is registered before proceeding
                 - " STATUS=$(aws opsworks describe-instances --stack-id ${opsworks_stackid}"
-                - !Sub " --region ${AWS::Region} --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].Status' --output text)"
+                - !Sub " --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].Status' --output text)"
                 - "\n"
                 - !Sub |
                   while [[ "$STATUS" != "registered" ]];
                   do
                     sleep 10
                 - "   STATUS=$(aws opsworks describe-instances --stack-id ${opsworks_stackid}"
-                - !Sub " --region ${AWS::Region} --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].Status' --output text)"
+                - !Sub " --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].Status' --output text)"
                 - "\n done\n"
                 - " INSTANCEID=$(aws opsworks describe-instances --stack-id ${opsworks_stackid}"
-                - !Sub " --region ${AWS::Region} --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)"
+                - !Sub " --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)"
                 - "\n"
-                - !Sub "  aws opsworks --region ${AWS::Region} assign-instance --instance-id "
+                - !Sub "  aws opsworks --region us-east-1 assign-instance --instance-id "
                 - "${INSTANCEID} --layer-ids "
                 - Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksLayerId
                 - "\n"

@@ -18,7 +18,6 @@
             - OpsWorksGitRepo
             - OpsWorksGitRepoBranch
             - OpsWorksGitSSHKey
-            - OpsWorksLayerSecurityGroups
         - Label:
             default: Lifecycle Handler Configuration
           Parameters:
@@ -27,8 +26,6 @@
             default: Stack Builder Configuration
           Parameters:
             - MinimumStackCount
-            - OnlineTrialsSubnetId
-            - OnlineTrialsVPCId
             - TrialLifetimeInDays
         - Label:
             default: Sensitive Parameters
@@ -36,6 +33,12 @@
             - AdminUsername
             - AdminPassword
             - MarketoSecret
+            - SystemsRole
+        - Label:
+            default: CI Parameters
+          Parameters:
+            - UpdatedTime
+            - IsADrSite
   Parameters:
     AdminUsername:
       Type: String
@@ -91,10 +94,13 @@
       Description: The Deploy PRIVATE key already created for the repo. Change SSH key newlines to commas
       NoEcho: true
       Default: " "
-    OpsWorksLayerSecurityGroups:
+    IsADrSite:
       Type: String
-      Description: A security group to add to the OpsWorks layer in addition to the default.
-      Default: sg-01f5d264
+      Description: Determines whether this deployment is a DR deployment or not
+      Default: false
+      AllowedValues:
+        - true
+        - false
     Stage:
       Type: String
       Description: The stage we are deploying to; either test or prod.
@@ -121,23 +127,26 @@
       Description: The URI that all requests for trials will be made to.
       Default: online-trial
       MinLength: 4
-    OnlineTrialsVPCId:
-      Type: String
-      Description: The VPC Id that the OpsWork Stack will be deployed to. Must be the same as the trials
-      MinLength: 12
-      Default: vpc-80b606e5
-    OnlineTrialsSubnetId:
-      Type: String
-      Description: A list of subnets. Must be associated with the Vpc Id.
-      MinLength: 15
-      Default: subnet-ac7f8ff5
-      AllowedValues:
-        - subnet-ac7f8ff5
-        - subnet-6745564f
-        - subnet-549c4d23
-        - subnet-e94076d3
   Conditions:
     CreatedByBamboo: !Equals [!Ref CreatedBy, Bamboo]
+    InNVirginia: !Equals [!Ref "AWS::Region", us-east-1]
+    DRSite: !Equals [!Ref IsADrSite, true]
+  Mappings:
+    SecurityGroup:
+      us-east-1: 
+        id: sg-01f5d264
+      eu-west-1:
+        id: sg-c8e00ab0
+    VPC:
+      us-east-1:
+        id: vpc-80b606e5
+      eu-west-1:
+        id: vpc-9803a6ff
+    SubnetForOpsWorks:
+      us-east-1:
+        id: subnet-ac7f8ff5
+      eu-west-1:
+        id: subnet-fe1cc499
   Resources:
     OnlineTrialRequestAPI:
       Type: AWS::ApiGateway::RestApi
@@ -217,7 +226,7 @@
         - OnlineTrialAssignStackDynamoDbTable
       Properties:
         Code:
-          S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
           S3Key: !Sub "AssignUserHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -401,7 +410,7 @@
         - OnlineTrialRequestDynamoDbTable
       Properties:
         Code:
-          S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
           S3Key: !Sub "FulfillmentHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -475,7 +484,7 @@
         - OnlineTrialRequestHandlerIamRole
       Properties:
         Code:
-            S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+            S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
             S3Key: !Sub "TrialRequestHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -495,7 +504,7 @@
         - OnlineTrialInstanceRequestSQS
       Properties:
         Code:
-          S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
           S3Key: !Sub "InstanceRequestHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -803,7 +812,7 @@
         - OnlineTrialLifecycleIamRole
       Properties:
         Code:
-          S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
           S3Key: !Sub "TrialLifecycleHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -948,7 +957,7 @@
         - OnlineTrialStackBuilderIamRole
       Properties:
         Code:
-          S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
           S3Key: !Sub "TrialStackBuilder-${Stage}.zip"
         Environment:
           Variables:
@@ -1086,7 +1095,7 @@
         - OnlineTrialTemplatesBucketHandlerIamRole
       Properties:
         Code:
-          S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
           S3Key: !Sub "EmptyBucketLambda-${Stage}.zip"
         Handler: org.alfresco.devops.EmptyBucktetsLambdaFunctionHandler
         MemorySize: 512
@@ -1141,7 +1150,8 @@
                   Resource: 
                     - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames"
                     - !If [CreatedByBamboo, !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/${APIDomainName}",
-                     !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/request${Stage}.trial.alfresco.com"]
+                      !If [DRSite, !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/request${Stage}-dr.trial.alfresco.com",
+                     !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/request${Stage}.trial.alfresco.com"]]
           - PolicyName: OnlineTrialCloudfrontPolicy
             PolicyDocument:
               Version: 2012-10-17
@@ -1156,12 +1166,13 @@
         - OnlineTrialAPICustomDomainNameIamRole
       Properties:
         Code:
-          S3Bucket: !Sub "online-trial-devops-lambda-${Stage}"
+          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
           S3Key: !Sub "ApiGatewayDomainName-${Stage}.zip"
         Environment:
           Variables:
             certificate_arn: !Ref APICertArn
-            domain_name: !If [CreatedByBamboo, !Ref APIDomainName, !Sub "request${Stage}.trial.alfresco.com"]
+            domain_name: !If [CreatedByBamboo, !Ref APIDomainName,
+              !If [DRSite, !Sub "request${Stage}-dr.trial.alfresco.com", !Sub "request${Stage}.trial.alfresco.com"]]
         FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "ApiGatewayDomainName-${Stage}"]
         Handler: api_domain_name.handler
         Role: !GetAtt OnlineTrialAPICustomDomainNameIamRole.Arn
@@ -1181,7 +1192,8 @@
         - OnlineTrialAPICustomDomainCustomResource
       Properties:
         BasePath: " " # Workaround for CF bug. Unless specified, even if empty/none is required, delete will fail.
-        DomainName: !If [CreatedByBamboo, !Ref APIDomainName, !Sub "request${Stage}.trial.alfresco.com"]
+        DomainName: !If [CreatedByBamboo, !Ref APIDomainName,
+              !If [DRSite, !Sub "request${Stage}-dr.trial.alfresco.com", !Sub "request${Stage}.trial.alfresco.com"]]
         RestApiId: !Ref OnlineTrialRequestAPI
         Stage: !Ref Stage
     OnlineTrialOpsWorksStack:
@@ -1198,12 +1210,12 @@
         DefaultInstanceProfileArn: !Sub "arn:aws:iam::${AWS::AccountId}:instance-profile/aws-opsworks-ec2-role" # default recommended by aws
         DefaultOs: Custom
         DefaultRootDeviceType: ebs
-        DefaultSubnetId: !Ref OnlineTrialsSubnetId
+        DefaultSubnetId: !FindInMap [ SubnetForOpsWorks , !Ref "AWS::Region", 'id' ]
         Name: !Sub "OnlineTrialOpsWorksStack-${Stage}"
         ServiceRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-opsworks-service-role" # current default
         UseCustomCookbooks: true
         UseOpsworksSecurityGroups: true
-        VpcId: !Ref OnlineTrialsVPCId
+        VpcId: !FindInMap [ VPC , !Ref "AWS::Region", 'id' ]
     OnlineTrialOpsWorksAlfrescoLayer:
       Type: AWS::OpsWorks::Layer
       DependsOn:
@@ -1213,7 +1225,7 @@
         AutoAssignPublicIps: true
         CustomInstanceProfileArn: !Sub "arn:aws:iam::${AWS::AccountId}:instance-profile/aws-opsworks-ec2-role"
         CustomSecurityGroupIds:
-          - !Ref OpsWorksLayerSecurityGroups
+          - !FindInMap [ SecurityGroup , !Ref "AWS::Region", 'id' ]
         EnableAutoHealing: true
         Name: !Sub "AlfrescoLayer-${Stage}"
         Shortname: !Sub "otalf-${Stage}"
@@ -1251,7 +1263,7 @@
                   Action:
                     - s3:GetObject
                   Resource:
-                    - !Sub "arn:aws:s3:::online-trial-devops-lambda-${Stage}/*"
+                    - !If [InNVirginia, !Sub "arn:aws:s3:::online-trial-devops-lambda-${Stage}/*", !Sub "arn:aws:s3:::online-trial-devops-lambda-${AWS::Region}-${Stage}/*"]
           - PolicyName: OnlineTrialLambdaUpdaterLoggingPolicy
             PolicyDocument:
               Version: 2012-10-17
@@ -1300,7 +1312,7 @@
                 print("{}\n".format(err))
         Environment:
           Variables:
-            bucket_name: !Sub "online-trial-devops-lambda-${Stage}"
+            bucket_name: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
         FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "LambdaUpdater-${Stage}"]
         Handler: index.handler
         Role: !GetAtt OnlineTrialLambdaUpdaterIamProfile.Arn
@@ -1437,7 +1449,7 @@
                 cfnresponse.send(event, context, cfnresponse.FAILED, {})
         Environment:
           Variables:
-            vpc_id: !Ref OnlineTrialsVPCId
+            vpc_id: !FindInMap [ VPC , !Ref "AWS::Region", 'id' ]
         FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "SubnetAllocator-${Stage}"]
         Handler: index.handler
         Role: !GetAtt TrialSubnetIdAllocatorIamRole.Arn
@@ -1668,7 +1680,7 @@
 
             def handler(event, context):
               try:
-                client = boto3.client('opsworks')
+                client = boto3.client('opsworks', region_name='us-east-1')
                 response = client.describe_instances(StackId=os.environ['stack_id'])
                 data = {}
                 for instance in response['Instances']:
@@ -1747,7 +1759,7 @@
             def handler(event, context):
               try:
                 if event['RequestType'] == 'Create':
-                  client = boto3.client('opsworks')
+                  client = boto3.client('opsworks', region_name='us-east-1')
                   instance_id = event['ResourceProperties']['InstanceId']
                   response = client.create_deployment(
                     StackId=os.environ['stack_id'],
@@ -1781,10 +1793,11 @@
       Value: !Sub "https://${OnlineTrialRequestAPI}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/${URI}"
     OnlineTrialsRequestDomainName:
       Description: The pretty domain name to hand over to marketing.
-      Value: !If [CreatedByBamboo, !Sub "https://${APIDomainName}/${URI}", !Sub "https://request${Stage}.trial.alfresco.com/${URI}"]
+      Value: !If [CreatedByBamboo, !Sub "https://${APIDomainName}/${URI}",
+              !If [DRSite, !Sub "https://request${Stage}-dr.trial.alfresco.com/${URI}", !Sub "https://request${Stage}.trial.alfresco.com/${URI}"]]
     OnlineTrialsVPCId:
       Description: The VPC for all trial stacks to deploy into
-      Value: !Ref OnlineTrialsVPCId
+      Value: !FindInMap [ VPC , !Ref "AWS::Region", 'id' ]
       Export:
         Name: !Sub "${AWS::StackName}-OnlineTrialsVPCId"
     TopicArn:
@@ -1807,7 +1820,7 @@
         Name: !Sub "${AWS::StackName}-OpsWorksDeploymentStage"
     OpsWorksLayerSecurityGroups:
       Description: The Security Group ID used for all Trial Instances
-      Value: !Ref OpsWorksLayerSecurityGroups
+      Value: !FindInMap [ SecurityGroup , !Ref "AWS::Region", 'id' ]
       Export:
         Name: !Sub "${AWS::StackName}-OpsWorksLayerSecurityGroups"
     # These Outputs below are Lambdas reused by all the child stacks
