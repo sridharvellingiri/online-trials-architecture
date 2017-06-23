@@ -850,6 +850,10 @@
       DeletionPolicy: Retain  # deleted by the custom lambda
       Properties:
         AccessControl: BucketOwnerFullControl
+        LifecycleConfiguration:
+          Rules:
+            - NoncurrentVersionExpirationInDays: 14
+              Status: Enabled
         Tags:
           - Key: Name
             Value: Online Trials Template Bucket
