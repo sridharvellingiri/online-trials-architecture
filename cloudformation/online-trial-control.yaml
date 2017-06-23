@@ -931,8 +931,8 @@
                   Action:
                     - s3:GetObject
                   Resource:
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}"
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}/*"
+                    - !GetAtt OnlineTrialStackTemplateBucket.Arn
+                    - !Sub "${OnlineTrialStackTemplateBucket.Arn}/*"
           - PolicyName: OnlineTrialStackBuilderIamPolicy
             PolicyDocument:
               Version: 2012-10-17
@@ -1035,8 +1035,8 @@
                     - s3:DeleteObjectVersion
                     - s3:PutObject
                   Resource:
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}"
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}/*"
+                    - !GetAtt OnlineTrialStackTemplateBucket.Arn
+                    - !Sub "${OnlineTrialStackTemplateBucket.Arn}/*"
     OnlineTrialTemplateBucketFillerHandler:
       Type: AWS::Lambda::Function
       DependsOn:
