@@ -51,7 +51,7 @@
       us-east-1:
         id: ami-e52819f3
       eu-west-1:
-        id: ami-ef9a8289
+        id: ami-2ac22753
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, " "]]
   Resources:

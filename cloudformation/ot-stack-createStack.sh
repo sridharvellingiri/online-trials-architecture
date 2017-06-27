@@ -42,7 +42,7 @@ else
   sed -i'.bak' "
       s/@@USERNAME@@/$USER_NAME/g;
       s/@@PASSWORD@@/$USER_PWD/g;
-      s/@@AMIID@@/$AMI_ID/g
+      s/@@AMI_ID@@/$AMI_ID/g
   " ot-stack-parameters.json
 
   # Validate the template
