@@ -6,5 +6,9 @@
   {
     "ParameterKey":"AdminPassword",
     "ParameterValue":"@@PASSWORD@@"
+  },
+  {
+    "ParameterKey":"BambooAMIID",
+    "ParameterValue":"@@AMI_ID@@"
   }
 ]

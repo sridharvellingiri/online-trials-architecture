@@ -8,10 +8,16 @@
             default: Trial Environment Configuration
           Parameters:
             - TrialInstanceType
+            - AdminUsername
+            - AdminPassword
         - Label:
             default: Control Architecture Configuration
           Parameters:
             - ControlArchitectureName
+        - Label:
+            default: CI parameters
+          Parameters:
+            - BambooAMIID
   Parameters:
     AdminUsername:
       Type: String
@@ -20,6 +26,10 @@
       Type: String
       Description: The password of the admin use rneeded to make internal API calls
       NoEcho: True
+    BambooAMIID:
+      Type: String
+      Description: An AMI produced by Bamboo to be used in the pipeline
+      Default: " "
     ControlArchitectureName:
       Description: The name of the Online Trial Control architecture cloudformation stack
       Type: String
@@ -45,9 +55,11 @@
         name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-e8b6fdfe
+        id: ami-62f6c774
       eu-west-1:
-        id: ami-ef9a8289
+        id: ami-5cdf3a25
+  Conditions:
+    UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, " "]]
   Resources:
     TrialRoute53DomainNameGenCustomResource:
       Type: Custom::DomainName
@@ -67,7 +79,7 @@
           Count: 1
       Properties:
         IamInstanceProfile: aws-opsworks-ec2-role
-        ImageId: !FindInMap [ami, !Ref "AWS::Region", id]
+        ImageId: !If [UseBambooAmi, !Ref BambooAMIID, !FindInMap [ami, !Ref "AWS::Region", id]]
         InstanceType: !Ref TrialInstanceType
         KeyName: !FindInMap [sshkey, !Ref "AWS::Region", name]
         SecurityGroupIds:
@@ -198,7 +210,6 @@
                   # These commands should probably be Cheffed pas part of AMI creation/config. They currently add 5-7 minutes to the wait time
                   if [[ "$RESULT" == 0 ]]; then
                     curl -L -u ${AdminUsername}:${AdminPassword} 'http://${AdminUsername}:${AdminPassword}@localhost:8070/alfresco/service/slingshot/node/search?q=%40name%3A%22Project%20Meeting%20Minutes%22&lang=lucene&store=workspace%3A%2F%2FSpacesStore'
-                    printf "MAILTO=\'\'\n*/5 * * * *\troot\t/usr/local/bin/monitor-services.sh" > /etc/cron.d/monitoring-services.cron
                   else
                     echo "Couldnt reach Alfresco within $TIMEOUT minutes. Exiting..."
                     /usr/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}

@@ -931,8 +931,8 @@
                   Action:
                     - s3:GetObject
                   Resource:
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}"
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}/*"
+                    - !GetAtt OnlineTrialStackTemplateBucket.Arn
+                    - !Sub "${OnlineTrialStackTemplateBucket.Arn}/*"
           - PolicyName: OnlineTrialStackBuilderIamPolicy
             PolicyDocument:
               Version: 2012-10-17
@@ -1035,8 +1035,8 @@
                     - s3:DeleteObjectVersion
                     - s3:PutObject
                   Resource:
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}"
-                    - !Sub "arn:aws:s3:::${OnlineTrialStackTemplateBucket}/*"
+                    - !GetAtt OnlineTrialStackTemplateBucket.Arn
+                    - !Sub "${OnlineTrialStackTemplateBucket.Arn}/*"
     OnlineTrialTemplateBucketFillerHandler:
       Type: AWS::Lambda::Function
       DependsOn:
@@ -1851,35 +1851,4 @@
       Value: !GetAtt TrialOpsWorksInitInstanceCookbookHandler.Arn
       Export:
         Name: !Sub "${AWS::StackName}-CookbookRunner"
-    # These Outputs below can be removed once all the stacks have stopped using them
-    StandardLoggingRole:
-      Description: IAM Role ARN to be used by Lambdas simply for logging
-      Value: !GetAtt TrialRoute53DomainNameGenIamRole.Arn
-      Export:
-        Name: !Sub "${AWS::StackName}-StandardLoggingRole"
-    SubnetIdRole:
-      Description: IAM Role ARN to be used by a Lambda to choose a subnet
-      Value: !GetAtt TrialSubnetIdAllocatorIamRole.Arn
-      Export:
-        Name: !Sub "${AWS::StackName}-SubnetIdRole"
-    Route53Role:
-      Description: IAM Role ARN to be used to create R53 record sets
-      Value: !GetAtt TrialRoute53RecordSetIamRole.Arn
-      Export:
-        Name: !Sub "${AWS::StackName}-Route53Role"
-    SystemsIAMRole:
-      Description: IAM Role ARN to be used for Cross Account access
-      Value: !Ref SystemsRole
-      Export:
-        Name: !Sub "${AWS::StackName}-SystemsIAMRole"
-    OpsWorksRegisterRole:
-      Description: IAM Role ARN to be used to deregister instances to OpsWorks
-      Value: !GetAtt TrialOpsWorkRegisterHandlerIamRole.Arn
-      Export:
-        Name: !Sub "${AWS::StackName}-OpsWorksRegisterRole"
-    OpsWorksCookbookRole:
-      Description: IAM Role ARN to be used to update custom cookbooks on each instance
-      Value: !GetAtt TrialOpsWorksInitialiseInstanceCookbooksIamRole.Arn
-      Export:
-        Name: !Sub "${AWS::StackName}-OpsWorksCookbookRole"
         
