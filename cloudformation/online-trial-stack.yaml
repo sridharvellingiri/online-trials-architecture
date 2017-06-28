@@ -8,10 +8,16 @@
             default: Trial Environment Configuration
           Parameters:
             - TrialInstanceType
+            - AdminUsername
+            - AdminPassword
         - Label:
             default: Control Architecture Configuration
           Parameters:
             - ControlArchitectureName
+        - Label:
+            default: CI parameters
+          Parameters:
+            - BambooAMIID
   Parameters:
     AdminUsername:
       Type: String
@@ -49,9 +55,9 @@
         name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-e52819f3
+        id: ami-62f6c774
       eu-west-1:
-        id: ami-2ac22753
+        id: ami-5cdf3a25
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, " "]]
   Resources:
