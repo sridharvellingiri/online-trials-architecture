@@ -29,7 +29,7 @@
     BambooAMIID:
       Type: String
       Description: An AMI produced by Bamboo to be used in the pipeline
-      Default: " "
+      Default: BuildMe
     ControlArchitectureName:
       Description: The name of the Online Trial Control architecture cloudformation stack
       Type: String
@@ -59,7 +59,7 @@
       eu-west-1:
         id: ami-5cdf3a25
   Conditions:
-    UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, " "]]
+    UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
     TrialRoute53DomainNameGenCustomResource:
       Type: Custom::DomainName
