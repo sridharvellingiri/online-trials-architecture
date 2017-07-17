@@ -55,9 +55,9 @@
         name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-62f6c774
+        id: ami-7f243169
       eu-west-1:
-        id: ami-5cdf3a25
+        id: ami-07d23e7e
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
