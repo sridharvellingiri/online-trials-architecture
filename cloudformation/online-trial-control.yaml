@@ -688,22 +688,10 @@
                   - apigateway.amazonaws.com
               Action:
                 - sts:AssumeRole
+        Path: "/"
+        ManagedPolicyArns: 
+          - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
         Policies:
-          - PolicyName: ApiGatewayLogsPolicy
-            PolicyDocument:
-              Version: 2012-10-17
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - logs:CreateLogGroup
-                    - logs:CreateLogStream
-                    - logs:DescribeLogGroups
-                    - logs:DescribeLogStreams
-                    - logs:PutLogEvents
-                    - logs:GetLogEvents
-                    - logs:FilterLogEvents
-                  Resource:
-                    - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*"
           - PolicyName: APIGatewayAWSProxyExecPolicy
             PolicyDocument:
               Version: 2012-10-17
