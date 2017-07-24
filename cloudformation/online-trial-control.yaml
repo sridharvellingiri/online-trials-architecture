@@ -1509,15 +1509,13 @@
             import os
             import boto3
             from botocore.exceptions import ClientError
-            import cfnresponse
 
             def handler(event, context):
               try:
-                session_name = event['id'] if 'id' in event else event['StackId'].split('/')[1]
                 sts = boto3.client('sts')
                 role = sts.assume_role(
                   RoleArn=os.environ['role'],
-                  RoleSessionName=session_name
+                  RoleSessionName=event['id']
                 )
                 print("Role Assumed OK")	
                 client = boto3.client(
@@ -1527,34 +1525,32 @@
                   aws_session_token=role['Credentials']['SessionToken']
                 )
                 print("Cross account R53 client created OK")
-                if 'RequestType' in event:
-                  action = 'DELETE' if event['RequestType'] == 'Delete' else 'UPSERT'
-                  name = event['ResourceProperties']['Name']
-                  public_ip = event['ResourceProperties']['PublicIp']
-                elif 'id' in event:
-                  action = 'DELETE' if event['detail']['state'] == 'shutting-down' else 'UPSERT'
-                  ec2 = boto3.client('ec2')
-                  data = ec2.describe_instances(InstanceIds=[event['detail']['instance-id']])
-                  name = None
-                  for instance in data['Reservations'][0]['Instances']:
-                    public_ip = instance['PublicIpAddress'] if 'PublicIpAddress' in instance else None
-                    if 'Tags' in instance:
-                      for tag in instance['Tags']:
-                        if tag['Key'] == 'Name':
-                          if 'trial' not in tag['Value']:
-                            print("{} is not a trial instance".format(tag['Value']))
-                            return 'SUCCESS'
-                          name = tag['Value'].split('.')[0]
-                        elif tag['Key'] == 'Stage':
-                          if tag['Value'] != os.environ['stage']:
-                            print("Ignoring {}, not on the same stage".format(event['detail']['instance-id']))
-                            return 'SUCCESS'
+                action = 'DELETE' if event['detail']['state'] == 'shutting-down' else 'UPSERT'
+                ec2 = boto3.client('ec2')
+                data = ec2.describe_instances(InstanceIds=[event['detail']['instance-id']])
+                name = None
+                for instance in data['Reservations'][0]['Instances']:
+                  if 'Tags' in instance:
+                    for tag in instance['Tags']:
+                      if tag['Key'] == 'Name':
+                        if 'trial' not in tag['Value']:
+                          print("{} is not a trial instance".format(tag['Value']))
+                          return 'SUCCESS'
+                        name = tag['Value'].split('.')[0]
+                      elif tag['Key'] == 'Stage':
+                        if tag['Value'] != os.environ['stage']:
+                          print("Ignoring {}, not on the same stage".format(event['detail']['instance-id']))
+                          return 'SUCCESS'
                 
-                print("action: {}, name: {}, ip: {}".format(action, name, public_ip))
-
                 if not name:
                   return 'FAILURE'
+                public_ip = client.list_resource_record_sets(
+                  HostedZoneId=os.environ['hosted_zone_id'],
+                  StartRecordName="{}.trial.alfresco.com".format(name),
+                  MaxItems='1'
+                )['ResourceRecordSets'][0]['ResourceRecords'][0]['Value']
                 
+                print("action: {}, name: {}, ip: {}".format(action, name, public_ip))                
                 requestData = {
                   'Changes': [
                     {
@@ -1563,34 +1559,29 @@
                         'Name': "{}.trial.alfresco.com.".format(name),
                         'Type': 'A',
                         'TTL': 300,
+                        'ResourceRecords': [
+                          {
+                            'Value': public_ip
+                          }
+                        ]
                       }
                     }
                   ]
                 }
-                if public_ip and len(public_ip) > 0:
-                  requestData['Changes'][0]['ResourceRecordSet']['ResourceRecords'] = [{'Value': public_ip}]
                 response = client.change_resource_record_sets(
                   HostedZoneId=os.environ['hosted_zone_id'],
                   ChangeBatch=requestData
                 )
-                if 'RequestType' in event:
-                  cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
                 return 'SUCCESS'
               except ClientError as e:
                 if e.response['Error']['Code'] == 'InvalidChangeBatch':
                   print("Could not delete record. Please delete it manually")
-                  if 'RequestType' in event:
-                    cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
                   return 'SUCCESS'
                 else:
                   print("{}".format(e.response['Error']['Message']))
-                  if 'RequestType' in event:
-                    cfnresponse.send(event, context, cfnresponse.FAILED, {})
                   return 'FAILURE'
               except Exception as err:
                 print("{}\n".format(err))
-                if 'RequestType' in event:
-                  cfnresponse.send(event, context, cfnresponse.FAILED, {})
                 return 'FAILURE'
         Environment:
           Variables:
