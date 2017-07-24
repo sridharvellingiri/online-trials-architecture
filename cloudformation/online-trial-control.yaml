@@ -1530,6 +1530,7 @@
                 data = ec2.describe_instances(InstanceIds=[event['detail']['instance-id']])
                 name = None
                 for instance in data['Reservations'][0]['Instances']:
+                  public_ip = instance['PublicIpAddress'] if 'PublicIpAddress' in instance else None
                   if 'Tags' in instance:
                     for tag in instance['Tags']:
                       if tag['Key'] == 'Name':
@@ -1544,11 +1545,13 @@
                 
                 if not name:
                   return 'FAILURE'
-                public_ip = client.list_resource_record_sets(
-                  HostedZoneId=os.environ['hosted_zone_id'],
-                  StartRecordName="{}.trial.alfresco.com".format(name),
-                  MaxItems='1'
-                )['ResourceRecordSets'][0]['ResourceRecords'][0]['Value']
+                  
+                if not public_ip:
+                  public_ip = client.list_resource_record_sets(
+                    HostedZoneId=os.environ['hosted_zone_id'],
+                    StartRecordName="{}.trial.alfresco.com".format(name),
+                    MaxItems='1'
+                  )['ResourceRecordSets'][0]['ResourceRecords'][0]['Value']
                 
                 print("action: {}, name: {}, ip: {}".format(action, name, public_ip))                
                 requestData = {
