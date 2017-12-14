@@ -38,7 +38,6 @@
             default: CI Parameters
           Parameters:
             - UpdatedTime
-            - IsADrSite
   Parameters:
     AdminUsername:
       Type: String
@@ -94,13 +93,6 @@
       Description: The Deploy PRIVATE key already created for the repo. Change SSH key newlines to commas
       NoEcho: true
       Default: " "
-    IsADrSite:
-      Type: String
-      Description: Determines whether this deployment is a DR deployment or not
-      Default: false
-      AllowedValues:
-        - true
-        - false
     Stage:
       Type: String
       Description: The stage we are deploying to; either test or prod.
@@ -130,7 +122,6 @@
   Conditions:
     CreatedByBamboo: !Equals [!Ref CreatedBy, Bamboo]
     InNVirginia: !Equals [!Ref "AWS::Region", us-east-1]
-    DRSite: !Equals [!Ref IsADrSite, true]
   Mappings:
     SecurityGroup:
       us-east-1: 
@@ -226,7 +217,11 @@
         - OnlineTrialAssignStackDynamoDbTable
       Properties:
         Code:
-          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+          S3Bucket:
+            !If
+            - InNVirginia
+            - !Sub "online-trial-devops-lambda-${Stage}"
+            - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
           S3Key: !Sub "AssignUserHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -237,7 +232,11 @@
             sqs_read_url: !Ref OnlineTrialInstanceRequestSQS
             username: !Ref AdminUsername
             password: !Ref AdminPassword
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "AssignUserHandler-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "AssignUserHandler-${Stage}"
         Handler: assign_user_handler.handler
         MemorySize: 256 
         Role: !GetAtt OnlineTrialAssignUserHandlerIamRole.Arn
@@ -410,13 +409,21 @@
         - OnlineTrialRequestDynamoDbTable
       Properties:
         Code:
-          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+          S3Bucket:
+            !If
+            - InNVirginia
+            - !Sub "online-trial-devops-lambda-${Stage}"
+            - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
           S3Key: !Sub "FulfillmentHandler-${Stage}.zip"
         Environment:
           Variables:
             topic_arn: !Ref OnlineTrialRequestSNSTopic
             trial_request_table: !Ref OnlineTrialRequestDynamoDbTable
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "FulfillmentHandler-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "FulfillmentHandler-${Stage}"
         Handler: FulfillmentHandlerLambda.lambda_handler
         Role: !GetAtt OnlineTrialFulfillmentIamRole.Arn
         Runtime: python2.7
@@ -484,7 +491,11 @@
         - OnlineTrialRequestHandlerIamRole
       Properties:
         Code:
-            S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+            S3Bucket:
+              !If
+              - InNVirginia
+              - !Sub "online-trial-devops-lambda-${Stage}"
+              - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
             S3Key: !Sub "TrialRequestHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -493,7 +504,11 @@
             client_secret: !Ref MarketoSecret
             sqs_url: !Ref OnlineTrialRequestSQS
             trial_request_table: !Ref OnlineTrialRequestDynamoDbTable
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "TrialRequestHandler-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "TrialRequestHandler-${Stage}"
         Handler: TrialRequestHandlerLambda.lambda_handler
         Role: !GetAtt OnlineTrialRequestHandlerIamRole.Arn
         Runtime: python2.7
@@ -504,14 +519,22 @@
         - OnlineTrialInstanceRequestSQS
       Properties:
         Code:
-          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+          S3Bucket:
+            !If
+            - InNVirginia
+            - !Sub "online-trial-devops-lambda-${Stage}"
+            - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
           S3Key: !Sub "InstanceRequestHandler-${Stage}.zip"
         Environment:
           Variables:
             sqs_read_url: !Ref OnlineTrialRequestSQS
             sqs_publish_url: !Ref OnlineTrialInstanceRequestSQS
             stage: !Ref Stage
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "InstanceRequestHandler-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "InstanceRequestHandler-${Stage}"
         Handler: InstanceRequestHandlerLambda.lambda_handler
         MemorySize: 256
         Role: !GetAtt OnlineTrialInstanceRequestHandlerIamRole.Arn
@@ -804,7 +827,11 @@
         - OnlineTrialLifecycleIamRole
       Properties:
         Code:
-          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+          S3Bucket:
+            !If
+            - InNVirginia
+            - !Sub "online-trial-devops-lambda-${Stage}"
+            - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
           S3Key: !Sub "TrialLifecycleHandler-${Stage}.zip"
         Environment:
           Variables:
@@ -812,7 +839,11 @@
             stage: !Ref Stage
             days_to_stop: !Ref DaysToStop
             layer_id: !Ref OnlineTrialOpsWorksAlfrescoLayer
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "TrialLifecycleHandler-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "TrialLifecycleHandler-${Stage}"
         Handler: triallifecycle.handler
         MemorySize: 512
         Role: !GetAtt OnlineTrialLifecycleIamRole.Arn
@@ -953,7 +984,11 @@
         - OnlineTrialStackBuilderIamRole
       Properties:
         Code:
-          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+          S3Bucket:
+            !If
+            - InNVirginia
+            - !Sub "online-trial-devops-lambda-${Stage}"
+            - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
           S3Key: !Sub "TrialStackBuilder-${Stage}.zip"
         Environment:
           Variables:
@@ -962,7 +997,11 @@
             stack_count: !Ref MinimumStackCount
             stage: !Ref Stage
             template_bucket_name: !Ref OnlineTrialStackTemplateBucket
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "TrialStackBuilder-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "TrialStackBuilder-${Stage}"
         Handler: TrialStackBuilderLambda.lambda_handler
         MemorySize: 256
         Role: !GetAtt OnlineTrialStackBuilderIamRole.Arn
@@ -1091,7 +1130,11 @@
         - OnlineTrialTemplatesBucketHandlerIamRole
       Properties:
         Code:
-          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+          S3Bucket:
+            !If
+            - InNVirginia
+            - !Sub "online-trial-devops-lambda-${Stage}"
+            - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
           S3Key: !Sub "EmptyBucketLambda-${Stage}.zip"
         Handler: org.alfresco.devops.EmptyBucktetsLambdaFunctionHandler
         MemorySize: 512
@@ -1145,9 +1188,10 @@
                     - apigateway:DELETE
                   Resource: 
                     - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames"
-                    - !If [CreatedByBamboo, !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/${APIDomainName}",
-                      !If [DRSite, !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/request${Stage}-dr.trial.alfresco.com",
-                     !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/request${Stage}.trial.alfresco.com"]]
+                    - !If
+                      - CreatedByBamboo
+                      - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/${APIDomainName}"
+                      - !Sub "arn:aws:apigateway:${AWS::Region}::/domainnames/request${Stage}.trial.alfresco.com"
           - PolicyName: OnlineTrialCloudfrontPolicy
             PolicyDocument:
               Version: 2012-10-17
@@ -1162,14 +1206,25 @@
         - OnlineTrialAPICustomDomainNameIamRole
       Properties:
         Code:
-          S3Bucket: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
+          S3Bucket:
+            !If
+            - InNVirginia
+            - !Sub "online-trial-devops-lambda-${Stage}"
+            - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
           S3Key: !Sub "ApiGatewayDomainName-${Stage}.zip"
         Environment:
           Variables:
             certificate_arn: !Ref APICertArn
-            domain_name: !If [CreatedByBamboo, !Ref APIDomainName,
-              !If [DRSite, !Sub "request${Stage}-dr.trial.alfresco.com", !Sub "request${Stage}.trial.alfresco.com"]]
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "ApiGatewayDomainName-${Stage}"]
+            domain_name:
+              !If
+              - CreatedByBamboo
+              - !Ref APIDomainName
+              - !Sub "request${Stage}.trial.alfresco.com"
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "ApiGatewayDomainName-${Stage}"
         Handler: api_domain_name.handler
         Role: !GetAtt OnlineTrialAPICustomDomainNameIamRole.Arn
         Runtime: python2.7
@@ -1188,8 +1243,11 @@
         - OnlineTrialAPICustomDomainCustomResource
       Properties:
         BasePath: " " # Workaround for CF bug. Unless specified, even if empty/none is required, delete will fail.
-        DomainName: !If [CreatedByBamboo, !Ref APIDomainName,
-              !If [DRSite, !Sub "request${Stage}-dr.trial.alfresco.com", !Sub "request${Stage}.trial.alfresco.com"]]
+        DomainName:
+          !If
+          - CreatedByBamboo
+          - !Ref APIDomainName
+          - !Sub "request${Stage}.trial.alfresco.com"
         RestApiId: !Ref OnlineTrialRequestAPI
         Stage: !Ref Stage
     OnlineTrialOpsWorksStack:
@@ -1259,7 +1317,10 @@
                   Action:
                     - s3:GetObject
                   Resource:
-                    - !If [InNVirginia, !Sub "arn:aws:s3:::online-trial-devops-lambda-${Stage}/*", !Sub "arn:aws:s3:::online-trial-devops-lambda-${AWS::Region}-${Stage}/*"]
+                    - !If
+                      - InNVirginia
+                      - !Sub "arn:aws:s3:::online-trial-devops-lambda-${Stage}/*"
+                      - !Sub "arn:aws:s3:::online-trial-devops-lambda-${AWS::Region}-${Stage}/*"
           - PolicyName: OnlineTrialLambdaUpdaterLoggingPolicy
             PolicyDocument:
               Version: 2012-10-17
@@ -1308,8 +1369,16 @@
                 print("{}\n".format(err))
         Environment:
           Variables:
-            bucket_name: !If [InNVirginia, !Sub "online-trial-devops-lambda-${Stage}", !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"]
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "LambdaUpdater-${Stage}"]
+            bucket_name:
+              !If
+              - InNVirginia
+              - !Sub "online-trial-devops-lambda-${Stage}"
+              - !Sub "online-trial-devops-lambda-${AWS::Region}-${Stage}"
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "LambdaUpdater-${Stage}"
         Handler: index.handler
         Role: !GetAtt OnlineTrialLambdaUpdaterIamProfile.Arn
         Runtime: python2.7
@@ -1370,7 +1439,11 @@
         Environment:
           Variables:
             days_to_stop: !Ref TrialLifetimeInDays
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "DomainNameGenerator-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "DomainNameGenerator-${Stage}"
         Handler: index.handler
         Role: !GetAtt TrialRoute53DomainNameGenIamRole.Arn
         Runtime: python2.7
@@ -1446,7 +1519,11 @@
         Environment:
           Variables:
             vpc_id: !FindInMap [ VPC , !Ref "AWS::Region", 'id' ]
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "SubnetAllocator-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "SubnetAllocator-${Stage}"
         Handler: index.handler
         Role: !GetAtt TrialSubnetIdAllocatorIamRole.Arn
         Runtime: python2.7
@@ -1591,7 +1668,11 @@
             hosted_zone_id: Z2KYYIWHSJMSS1
             role: !Ref SystemsRole
             stage: !Ref Stage
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "RecordSetCreator-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "RecordSetCreator-${Stage}"
         Handler: index.handler
         Role: !GetAtt TrialRoute53RecordSetIamRole.Arn
         Runtime: python2.7
@@ -1695,7 +1776,11 @@
         Environment:
           Variables:
             stack_id: !Ref OnlineTrialOpsWorksStack
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "OpsWorksRegisterer-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "OpsWorksRegisterer-${Stage}"
         Handler: index.handler
         Role: !GetAtt TrialOpsWorkRegisterHandlerIamRole.Arn
         Runtime: python2.7
@@ -1767,7 +1852,11 @@
         Environment:
           Variables:
             stack_id: !Ref OnlineTrialOpsWorksStack
-        FunctionName: !If [CreatedByBamboo, !Ref "AWS::NoValue", !Sub "CookbookRunner-${Stage}"]
+        FunctionName:
+          !If
+          - CreatedByBamboo
+          - !Ref "AWS::NoValue"
+          - !Sub "CookbookRunner-${Stage}"
         Handler: index.handler
         Role: !GetAtt TrialOpsWorksInitialiseInstanceCookbooksIamRole.Arn
         Runtime: python2.7
@@ -1781,8 +1870,11 @@
       Value: !Sub "https://${OnlineTrialRequestAPI}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/${URI}"
     OnlineTrialsRequestDomainName:
       Description: The pretty domain name to hand over to marketing.
-      Value: !If [CreatedByBamboo, !Sub "https://${APIDomainName}/${URI}",
-              !If [DRSite, !Sub "https://request${Stage}-dr.trial.alfresco.com/${URI}", !Sub "https://request${Stage}.trial.alfresco.com/${URI}"]]
+      Value:
+        !If
+        - CreatedByBamboo
+        - !Sub "https://${APIDomainName}/${URI}"
+        - !Sub "https://request${Stage}.trial.alfresco.com/${URI}"
     OnlineTrialsVPCId:
       Description: The VPC for all trial stacks to deploy into
       Value: !FindInMap [ VPC , !Ref "AWS::Region", 'id' ]
