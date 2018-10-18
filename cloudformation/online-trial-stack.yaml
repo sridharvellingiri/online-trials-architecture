@@ -54,7 +54,7 @@
         name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-08e175870e6db71a5
+        id: ami-01d8593e8f4e0f85e
       eu-west-1:
         id: ami-4878fc31
   Conditions:
@@ -111,62 +111,75 @@
                   echo "Configuring docker-compose.yml..."
                   PASSWORD=$(printf %s "${AdminPassword}" | iconv -t utf16le | openssl md4 | awk '{ print $2}')
                   sed -i s,@@ADMIN_PASSWORD@@,$PASSWORD,g /opt/alfresco/docker-compose/docker-compose.yml
-                  # register instance with OpsWorks stack
                   echo "Registering instance with OpsWorks stack..."
                   aws opsworks register --stack-id $OPSWORKS_STACKID --infrastructure-class ec2 --region us-east-1 --override-hostname ${TrialRoute53DomainNameGenCustomResource.DomainName} --local --use-instance-profile
-                  # enable, start and wait for docker-compose
-                  systemctl enable docker-compose
-                  systemctl start docker-compose
-                  echo "Waiting 5 minutes for docker-compose to start..."
-                  sleep 5m
-                  echo "Checking the repository is up..."
-                  RESULT=0
-                  TIMEOUT=5
-                  ITERATION=0
-                  COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8082/alfresco/"
-                  while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
-                  do
-                    if [[ $ITERATION -eq $TIMEOUT ]]; then
-                      echo "Repository timeout after $TIMEOUT minutes."
-                      RESULT=1
-                      break
-                    fi
-                    echo "HTTPCODE=$HTTPCODE Waiting for repository to come up... $((ITERATION++))/$TIMEOUT"
-                    sleep 1m
-                  done
-                  echo "Checking Share is up..."
+                  RESULT=$?
                   if [[ "$RESULT" == 0 ]]; then
+                    echo "Starting docker-compose service..."
+                    systemctl enable docker-compose
+                    systemctl start docker-compose
+                    echo "Waiting 5 minutes for docker-compose to start..."
+                    sleep 5m
+                    echo "Checking the repository is up..."
+                    TIMEOUT=5
                     ITERATION=0
-                    COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8080/share/page/"
+                    COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8082/alfresco/"
                     while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
                     do
                       if [[ $ITERATION -eq $TIMEOUT ]]; then
-                        echo "Share timeout after $TIMEOUT minutes."
+                        echo "Repository timeout after $TIMEOUT minutes"
                         RESULT=1
                         break
                       fi
-                      echo "HTTPCODE=$HTTPCODE Waiting for Share to come up... $((ITERATION++))/$TIMEOUT"
+                      echo "HTTPCODE=$HTTPCODE Waiting for repository to come up... $((ITERATION++))/$TIMEOUT"
                       sleep 1m
                     done
+                    if [[ "$RESULT" == 0 ]]; then
+                      echo "Checking Share is up..."
+                      ITERATION=0
+                      COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8080/share/page/"
+                      while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
+                      do
+                        if [[ $ITERATION -eq $TIMEOUT ]]; then
+                          echo "Share timeout after $TIMEOUT minutes"
+                          RESULT=1
+                          break
+                        fi
+                        echo "HTTPCODE=$HTTPCODE Waiting for Share to come up... $((ITERATION++))/$TIMEOUT"
+                        sleep 1m
+                      done
+                      if [[ "$RESULT" == 0 ]]; then
+                        # register instance with OpsWorks stack
+                        echo "Assigning instance to OpsWorks layer..."
+                        INSTANCE_ID=$(aws opsworks describe-instances --stack-id $OPSWORKS_STACKID --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)
+                        if [[ "$INSTANCE_ID" != "" ]]; then
+                          aws opsworks wait instance-registered --region us-east-1 --instance-id $INSTANCE_ID
+                          RESULT=$?
+                          if [[ "$RESULT" == 0 ]]; then
+                            aws opsworks --region us-east-1 assign-instance --instance-id $INSTANCE_ID --layer-ids $OPSWORKS_LAYERID
+                            RESULT=$?
+                            if [[ "$RESULT" != 0 ]]; then
+                              echo "Failed to assign instance to OpsWorks layer"
+                            fi
+                          else
+                            echo "Failed to find registered instance in OpsWorks"
+                          fi
+                        else
+                          RESULT=1
+                          echo "Failed to find instace-id in OpsWorks stack"
+                        fi
+                      else
+                        echo "Could not reach Share within $TIMEOUT minutes"
+                      fi
+                    else
+                      echo "Could not reach the repository within $TIMEOUT minutes"
+                    fi
                   else
-                    echo "Could not reach the repository within $TIMEOUT minutes. Exiting..."
-                    /opt/aws/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                    exit $RESULT
+                    echo "Failed to register instance with OpsWorks"
                   fi
-                  if [[ "$RESULT" == 0 ]]; then
-                    # register instance with OpsWorks stack
-                    echo "Assigning instance to OpsWorks layer..."
-                    INSTANCE_ID=$(aws opsworks describe-instances --stack-id $OPSWORKS_STACKID --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)
-                    aws opsworks wait instance-registered --region us-east-1 --instance-id $INSTANCE_ID
-                    aws opsworks --region us-east-1 assign-instance --instance-id $INSTANCE_ID --layer-ids $OPSWORKS_LAYERID
-                    # tell CloudFormation we are done
-                    echo "RESULT is $RESULT, sending signal to cloudformation"
-                    /opt/aws/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                  else
-                    echo "Could not reach Share within $TIMEOUT minutes. Exiting..."
-                    /opt/aws/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                    exit $RESULT
-                  fi
+                  # tell CloudFormation we are done
+                  echo "RESULT is $RESULT, sending signal to cloudformation"
+                  /opt/aws/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
 
     TrialOpsWorksRegisterHandlerCustomResource:
       Type: Custom::OpsWorksRegister
