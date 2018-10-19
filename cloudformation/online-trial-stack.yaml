@@ -76,6 +76,17 @@
         ResourceSignal:
           Timeout: PT45M
           Count: 1
+      Metadata:
+        AWS::CloudFormation::Init:
+          config:
+            files:
+              '/tmp/generate-admin-pwd':
+                content: !Sub |
+                  #!/bin/bash
+                  printf %s "${AdminPassword}" | iconv -t utf16le | openssl md4 | awk '{ print $2}'
+                mode: '000550'
+                owner: root
+                group: root
       Properties:
         IamInstanceProfile: aws-opsworks-ec2-role
         ImageId: !If [UseBambooAmi, !Ref BambooAMIID, !FindInMap [ami, !Ref "AWS::Region", id]]
@@ -108,9 +119,12 @@
                 - Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksLayerId
                 - "\n"
                 - !Sub |
+                  echo "Running cfn-init..."
+                  /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
                   echo "Configuring docker-compose.yml..."
-                  PASSWORD=$(printf %s "${AdminPassword}" | iconv -t utf16le | openssl md4 | awk '{ print $2}')
-                  sed -i s,@@ADMIN_PASSWORD@@,$PASSWORD,g /opt/alfresco/docker-compose/docker-compose.yml
+                  ADMIN_PASSWORD=$(/tmp/generate-admin-pwd)
+                  sed -i s,@@ADMIN_PASSWORD@@,$ADMIN_PASSWORD,g /opt/alfresco/docker-compose/docker-compose.yml
+                  rm /tmp/generate-admin-pwd
                   echo "Registering instance with OpsWorks stack..."
                   aws opsworks register --stack-id $OPSWORKS_STACKID --infrastructure-class ec2 --region us-east-1 --override-hostname ${TrialRoute53DomainNameGenCustomResource.DomainName} --local --use-instance-profile
                   RESULT=$?
