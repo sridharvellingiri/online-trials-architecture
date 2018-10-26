@@ -54,7 +54,7 @@
         name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-032b84d61eadf796c
+        id: ami-0f1bd8f71413b89c1
       eu-west-1:
         id: ami-4878fc31
   Conditions:
