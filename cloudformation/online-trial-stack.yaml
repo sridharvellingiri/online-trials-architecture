@@ -54,7 +54,7 @@
         name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-0f1bd8f71413b89c1
+        id: ami-0cfe5d1ca373ee94b
       eu-west-1:
         id: ami-4878fc31
   Conditions:
@@ -125,6 +125,9 @@
                   ADMIN_PASSWORD=$(/tmp/generate-admin-pwd)
                   sed -i s,@@ADMIN_PASSWORD@@,$ADMIN_PASSWORD,g /opt/alfresco/docker-compose/docker-compose.yml
                   rm /tmp/generate-admin-pwd
+                  sed -i s,@@EXTERNAL_PROTOCOL@@,https,g /opt/alfresco/docker-compose/docker-compose.yml
+                  sed -i s,@@EXTERNAL_HOST@@,${TrialRoute53DomainNameGenCustomResource.DomainName}.trial.alfresco.com,g /opt/alfresco/docker-compose/docker-compose.yml
+                  sed -i s,@@EXTERNAL_PORT@@,443,g /opt/alfresco/docker-compose/docker-compose.yml
                   echo "Registering instance with OpsWorks stack..."
                   aws opsworks register --stack-id $OPSWORKS_STACKID --infrastructure-class ec2 --region us-east-1 --override-hostname ${TrialRoute53DomainNameGenCustomResource.DomainName} --local --use-instance-profile
                   RESULT=$?
