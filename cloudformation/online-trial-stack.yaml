@@ -54,7 +54,7 @@
         name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-0cfe5d1ca373ee94b
+        id: ami-05ee8f5274ce94dff
       eu-west-1:
         id: ami-4878fc31
   Conditions:
@@ -166,24 +166,41 @@
                         sleep 1m
                       done
                       if [[ "$RESULT" == 0 ]]; then
-                        # register instance with OpsWorks stack
-                        echo "Assigning instance to OpsWorks layer..."
-                        INSTANCE_ID=$(aws opsworks describe-instances --stack-id $OPSWORKS_STACKID --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)
-                        if [[ "$INSTANCE_ID" != "" ]]; then
-                          aws opsworks wait instance-registered --region us-east-1 --instance-id $INSTANCE_ID
-                          RESULT=$?
-                          if [[ "$RESULT" == 0 ]]; then
-                            aws opsworks --region us-east-1 assign-instance --instance-id $INSTANCE_ID --layer-ids $OPSWORKS_LAYERID
+                        echo "Checking the Digital Workspace is up..."
+                        ITERATION=0
+                        COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:3001"
+                        while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
+                        do
+                          if [[ $ITERATION -eq $TIMEOUT ]]; then
+                            echo "Digital Workspace timeout after $TIMEOUT minutes"
+                            RESULT=1
+                            break
+                          fi
+                          echo "HTTPCODE=$HTTPCODE Waiting for the Digital Workspace to come up... $((ITERATION++))/$TIMEOUT"
+                          sleep 1m
+                        done
+                        if [[ "$RESULT" == 0 ]]; then
+                          # register instance with OpsWorks stack
+                          echo "Assigning instance to OpsWorks layer..."
+                          INSTANCE_ID=$(aws opsworks describe-instances --stack-id $OPSWORKS_STACKID --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)
+                          if [[ "$INSTANCE_ID" != "" ]]; then
+                            aws opsworks wait instance-registered --region us-east-1 --instance-id $INSTANCE_ID
                             RESULT=$?
-                            if [[ "$RESULT" != 0 ]]; then
-                              echo "Failed to assign instance to OpsWorks layer"
+                            if [[ "$RESULT" == 0 ]]; then
+                              aws opsworks --region us-east-1 assign-instance --instance-id $INSTANCE_ID --layer-ids $OPSWORKS_LAYERID
+                              RESULT=$?
+                              if [[ "$RESULT" != 0 ]]; then
+                                echo "Failed to assign instance to OpsWorks layer"
+                              fi
+                            else
+                              echo "Failed to find registered instance in OpsWorks"
                             fi
                           else
-                            echo "Failed to find registered instance in OpsWorks"
+                            RESULT=1
+                            echo "Failed to find instace-id in OpsWorks stack"
                           fi
                         else
-                          RESULT=1
-                          echo "Failed to find instace-id in OpsWorks stack"
+                          echo "Could not reach the Digital Workspace within $TIMEOUT minutes"
                         fi
                       else
                         echo "Could not reach Share within $TIMEOUT minutes"
