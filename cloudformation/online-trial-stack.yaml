@@ -47,16 +47,11 @@
         - m4.2xlarge
         - m4.4xlarge
   Mappings:
-    sshkey:
-      us-east-1:
-        name: salty-trials
-      eu-west-1:
-        name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-05ee8f5274ce94dff
+        id: ami-037f40a71f7b4512b
       eu-west-1:
-        id: ami-4878fc31
+        id: ami-04fb5a904e48034c2
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
@@ -91,7 +86,7 @@
         IamInstanceProfile: aws-opsworks-ec2-role
         ImageId: !If [UseBambooAmi, !Ref BambooAMIID, !FindInMap [ami, !Ref "AWS::Region", id]]
         InstanceType: !Ref TrialInstanceType
-        KeyName: !FindInMap [sshkey, !Ref "AWS::Region", name]
+        KeyName: online-trial
         SecurityGroupIds:
           - Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksLayerSecurityGroups"
         SourceDestCheck: true
