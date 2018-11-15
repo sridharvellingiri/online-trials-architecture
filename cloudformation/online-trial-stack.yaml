@@ -38,26 +38,20 @@
     TrialInstanceType:
       Description: The type of EC2 instance to deploy the AMI to
       Type: String
-      Default: t2.medium
+      Default: t2.large
       MinLength: 1
       AllowedValues:
-        - t2.medium
         - t2.large
         - m4.large
         - m4.xlarge
         - m4.2xlarge
         - m4.4xlarge
   Mappings:
-    sshkey:
-      us-east-1:
-        name: salty-trials
-      eu-west-1:
-        name: trials-dr-key
     ami:
       us-east-1:
-        id: ami-367e0a4c
+        id: ami-0fa5cbcbee8256e5a
       eu-west-1:
-        id: ami-4878fc31
+        id: ami-07d4a27e435694807
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
@@ -77,11 +71,22 @@
         ResourceSignal:
           Timeout: PT45M
           Count: 1
+      Metadata:
+        AWS::CloudFormation::Init:
+          config:
+            files:
+              '/tmp/generate-admin-pwd':
+                content: !Sub |
+                  #!/bin/bash
+                  printf %s "${AdminPassword}" | iconv -t utf16le | openssl md4 | awk '{ print $2}'
+                mode: '000550'
+                owner: root
+                group: root
       Properties:
         IamInstanceProfile: aws-opsworks-ec2-role
         ImageId: !If [UseBambooAmi, !Ref BambooAMIID, !FindInMap [ami, !Ref "AWS::Region", id]]
         InstanceType: !Ref TrialInstanceType
-        KeyName: !FindInMap [sshkey, !Ref "AWS::Region", name]
+        KeyName: online-trial
         SecurityGroupIds:
           - Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksLayerSecurityGroups"
         SourceDestCheck: true
@@ -101,142 +106,110 @@
         UserData:
           Fn::Base64:
             Fn::Join:
-              - ''
-              - - !Sub |
-                  #!/bin/bash -x
-                  /usr/bin/easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz || sleep 10
-                  RESULT=0
-                  TIMEOUT=45
-                  echo "Prepping json file for first chef run"
-                  cd /etc/chef
-                  cat > run-chef-client.json << EOF
-                  {
-                    "name": "localhost",
-                    "artifact-deployer" : {
-                        "awscli" : {
-                            "credentials_databag" :"aws",
-                            "credentials_databag_item" : "salty"
-                        }
-                    },
-                    "resolver" : {
-                        "search" : "alfresco.pri ec2.internal",
-                        "nameservers" : ["8.8.8.8", "8.26.56.26"],
-                        "lock_resolver_conf" : true
-                    },
-                    "hosts" : {
-                        "hostname" : "${TrialRoute53DomainNameGenCustomResource.DomainName}.trial",
-                        "domain" : "alfresco.com",
-                        "host_list" : {
-                            "minislaven1 minislaven1.alfresco.pri" : "10.80.217.144",
-                            "syslogp syslogp.trial-alfresco1 syslogp.trial-alfresco1.alfresco.pri" : "10.0.9.99"
-                        }
-                    },
-                    "salty" : {},
-                    "alfresco" : {
-                        "public_hostname" : "${TrialRoute53DomainNameGenCustomResource.DomainName}.trial.alfresco.com",
-                        "certs" : {
-                          "ssl_databag" : "ssl",
-                          "ssl_databag_item" : "saltydog_com"
-                        }
-                    },
-                    "cwlogs": {
-                      "region": "${AWS::Region}",
-                      "use_gzip_http_content_encoding": false
-                    },
-                    "rsyslog" : {
-                        "server_ip" : "syslogp"
-                    },
-                    "run_list": [
-                        "img-trials::run-chef-client"
-                    ]
-                  }
-                  EOF
-                  echo "File prepped for first chef run."
-                  echo "Running Chef for the first time"
-                  chef-client -z -j run-chef-client.json
-                  RESULT=$?
-                  echo "Current result is $RESULT after initial Chef run"
-                  if [[ "$RESULT" == 0 ]]; then
-                - opsworks_stackid=
+              - ""
+              - - "#!/bin/bash\n"
+                - "OPSWORKS_STACKID="
                 - Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksStackId
-                - "\n"
-                - "aws opsworks register --stack-id ${opsworks_stackid}"
-                - !Sub " --infrastructure-class ec2 --region us-east-1 --local --use-instance-profile"
-                - "\n"
-                - !Sub |
-                  else
-                    echo "Chef run failed. Result is $RESULT"
-                    /usr/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                    exit $RESULT
-                  fi
-                  if [[ "$RESULT" == 0 ]]; then
-                    echo "Waiting for Share..."
-                    ITERATION=0
-                    COMMAND="curl -s -o /dev/null -I -w %{http_code} 127.0.0.1:8081/share/page"
-                    while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
-                    do
-                      if [[ $ITERATION -eq $TIMEOUT ]]; then
-                        echo "Share timeout after $TIMEOUT minutes."
-                        RESULT=1
-                        break
-                      fi
-                      echo "HTTPCODE=$HTTPCODE Waiting for Share to come up... $((ITERATION++))/$TIMEOUT"
-                      sleep 1m
-                    done
-                  else
-                    echo "Chef run with run-chef-client.json failed. Exiting..."
-                    /usr/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                    exit $RESULT
-                  fi
-                  if [[ "$RESULT" == 0 ]]; then
-                    echo "Waiting for Alfresco..."
-                    ITERATION=0
-                    COMMAND="curl -s -o /dev/null -I -w %{http_code} 127.0.0.1:8070"
-                    while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
-                    do
-                      if [[ $ITERATION -eq $TIMEOUT ]]; then
-                        echo "Alfresco timeout after $TIMEOUT minutes."
-                        RESULT=1
-                        break
-                      fi
-                      echo "HTTPCODE=$HTTPCODE Waiting for Alfresco to come up... $((ITERATION++))/$TIMEOUT"
-                      sleep 1m
-                    done
-                  else
-                    echo "Couldnt reach Share within $TIMEOUT minutes. Exiting..."
-                    /usr/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                    exit $RESULT
-                  fi
-                  # These commands should probably be Cheffed as part of AMI creation/config. They currently add 5-7 minutes to the wait time
-                  if [[ "$RESULT" == 0 ]]; then
-                    curl -L -u ${AdminUsername}:${AdminPassword} 'http://${AdminUsername}:${AdminPassword}@localhost:8070/alfresco/service/slingshot/node/search?q=%40name%3A%22Project%20Meeting%20Minutes%22&lang=lucene&store=workspace%3A%2F%2FSpacesStore'
-                  else
-                    echo "Couldnt reach Alfresco within $TIMEOUT minutes. Exiting..."
-                    /usr/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                    exit $RESULT
-                  fi
-                  # Register this instance with the correct OpsWorks Layer
-                  if [[ "$RESULT" == 0 ]]; then
-                - " INSTANCE_ID=$(aws opsworks describe-instances --stack-id $opsworks_stackid"
-                - !Sub " --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)"
-                - "\n"
-                - aws opsworks wait instance-registered --region us-east-1 --instance-id $INSTANCE_ID
-                - "\n"
-                - !Sub "aws opsworks --region us-east-1 assign-instance --instance-id "
-                - "${INSTANCE_ID} --layer-ids "
+                - "\nOPSWORKS_LAYERID="
                 - Fn::ImportValue: !Sub ${ControlArchitectureName}-OpsWorksLayerId
                 - "\n"
                 - !Sub |
+                  echo "Running cfn-init..."
+                  /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
+                  echo "Configuring docker-compose.yml..."
+                  ADMIN_PASSWORD=$(/tmp/generate-admin-pwd)
+                  sed -i s,@@ADMIN_PASSWORD@@,$ADMIN_PASSWORD,g /opt/alfresco/docker-compose/docker-compose.yml
+                  rm /tmp/generate-admin-pwd
+                  sed -i s,@@EXTERNAL_PROTOCOL@@,https,g /opt/alfresco/docker-compose/docker-compose.yml
+                  sed -i s,@@EXTERNAL_HOST@@,${TrialRoute53DomainNameGenCustomResource.DomainName}.trial.alfresco.com,g /opt/alfresco/docker-compose/docker-compose.yml
+                  sed -i s,@@EXTERNAL_PORT@@,443,g /opt/alfresco/docker-compose/docker-compose.yml
+                  echo "Registering instance with OpsWorks stack..."
+                  aws opsworks register --stack-id $OPSWORKS_STACKID --infrastructure-class ec2 --region us-east-1 --override-hostname ${TrialRoute53DomainNameGenCustomResource.DomainName} --local --use-instance-profile
+                  RESULT=$?
+                  if [[ "$RESULT" == 0 ]]; then
+                    echo "Starting docker-compose service..."
+                    systemctl enable docker-compose
+                    systemctl start docker-compose
+                    echo "Waiting 5 minutes for docker-compose to start..."
+                    sleep 5m
+                    echo "Checking the repository is up..."
+                    TIMEOUT=5
+                    ITERATION=0
+                    COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8082/alfresco/"
+                    while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
+                    do
+                      if [[ $ITERATION -eq $TIMEOUT ]]; then
+                        echo "Repository timeout after $TIMEOUT minutes"
+                        RESULT=1
+                        break
+                      fi
+                      echo "HTTPCODE=$HTTPCODE Waiting for repository to come up... $((ITERATION++))/$TIMEOUT"
+                      sleep 1m
+                    done
+                    if [[ "$RESULT" == 0 ]]; then
+                      echo "Checking Share is up..."
+                      ITERATION=0
+                      COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8080/share/page/"
+                      while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
+                      do
+                        if [[ $ITERATION -eq $TIMEOUT ]]; then
+                          echo "Share timeout after $TIMEOUT minutes"
+                          RESULT=1
+                          break
+                        fi
+                        echo "HTTPCODE=$HTTPCODE Waiting for Share to come up... $((ITERATION++))/$TIMEOUT"
+                        sleep 1m
+                      done
+                      if [[ "$RESULT" == 0 ]]; then
+                        echo "Checking the Digital Workspace is up..."
+                        ITERATION=0
+                        COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:3001"
+                        while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
+                        do
+                          if [[ $ITERATION -eq $TIMEOUT ]]; then
+                            echo "Digital Workspace timeout after $TIMEOUT minutes"
+                            RESULT=1
+                            break
+                          fi
+                          echo "HTTPCODE=$HTTPCODE Waiting for the Digital Workspace to come up... $((ITERATION++))/$TIMEOUT"
+                          sleep 1m
+                        done
+                        if [[ "$RESULT" == 0 ]]; then
+                          # register instance with OpsWorks stack
+                          echo "Assigning instance to OpsWorks layer..."
+                          INSTANCE_ID=$(aws opsworks describe-instances --stack-id $OPSWORKS_STACKID --region us-east-1 --query 'Instances[?Hostname==`${TrialRoute53DomainNameGenCustomResource.DomainName}`].InstanceId' --output text)
+                          if [[ "$INSTANCE_ID" != "" ]]; then
+                            aws opsworks wait instance-registered --region us-east-1 --instance-id $INSTANCE_ID
+                            RESULT=$?
+                            if [[ "$RESULT" == 0 ]]; then
+                              aws opsworks --region us-east-1 assign-instance --instance-id $INSTANCE_ID --layer-ids $OPSWORKS_LAYERID
+                              RESULT=$?
+                              if [[ "$RESULT" != 0 ]]; then
+                                echo "Failed to assign instance to OpsWorks layer"
+                              fi
+                            else
+                              echo "Failed to find registered instance in OpsWorks"
+                            fi
+                          else
+                            RESULT=1
+                            echo "Failed to find instace-id in OpsWorks stack"
+                          fi
+                        else
+                          echo "Could not reach the Digital Workspace within $TIMEOUT minutes"
+                        fi
+                      else
+                        echo "Could not reach Share within $TIMEOUT minutes"
+                      fi
+                    else
+                      echo "Could not reach the repository within $TIMEOUT minutes"
+                    fi
+                  else
+                    echo "Failed to register instance with OpsWorks"
                   fi
-                  # send result to cloudformation
+                  # tell CloudFormation we are done
                   echo "RESULT is $RESULT, sending signal to cloudformation"
-                  /usr/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
-                  # Add Wazuh agent installation, configuration and provisioning
-                  # script only accessible from trials VPC
-                  # curl -s https://s3.amazonaws.com/online-trial-control-ttp/installation-wazuh-agent-mode.sh | bash -s --
-                  # Add Suricata and Evebox agent installation, configuration and provisioning
-                  # script only accessible from trials VPC
-                  # curl -s https://s3.amazonaws.com/online-trial-control-ttp/installation-suricata-agent-mode.sh | bash -s --
+                  /opt/aws/bin/cfn-signal -e $RESULT --stack ${AWS::StackName} --resource TrialEc2Instance --region ${AWS::Region}
+
     TrialOpsWorksRegisterHandlerCustomResource:
       Type: Custom::OpsWorksRegister
       DependsOn:
@@ -251,6 +224,7 @@
         ServiceToken:
           Fn::ImportValue: !Sub "${ControlArchitectureName}-CookbookRunner"
         InstanceId: !GetAtt TrialOpsWorksRegisterHandlerCustomResource.InstanceId
+
   Outputs:
     Type:
       Description: The type of stack this is.
@@ -268,4 +242,3 @@
       Description: The environment this stack has been deployed to; test or prod
       Value:
         Fn::ImportValue: !Sub "${ControlArchitectureName}-OpsWorksDeploymentStage"
-    
