@@ -49,9 +49,9 @@
   Mappings:
     ami:
       us-east-1:
-        id: ami-0fa5cbcbee8256e5a
+        id: ami-009bacc3771af4143
       eu-west-1:
-        id: ami-07d4a27e435694807
+        id: ami-008839658a5277144
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
@@ -149,7 +149,7 @@
                     if [[ "$RESULT" == 0 ]]; then
                       echo "Checking Share is up..."
                       ITERATION=0
-                      COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8080/share/page/"
+                      COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8094/share/page/"
                       while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
                       do
                         if [[ $ITERATION -eq $TIMEOUT ]]; then
@@ -163,7 +163,7 @@
                       if [[ "$RESULT" == 0 ]]; then
                         echo "Checking the Digital Workspace is up..."
                         ITERATION=0
-                        COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:3001"
+                        COMMAND="curl -s -o /dev/null -I -w %{http_code} localhost:8095"
                         while HTTPCODE=$($COMMAND); [[ $HTTPCODE != 200 ]];
                         do
                           if [[ $ITERATION -eq $TIMEOUT ]]; then
