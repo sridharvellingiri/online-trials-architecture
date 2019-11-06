@@ -24,7 +24,7 @@
       Description: The username of the admin user needed to make internal API calls
     AdminPassword:
       Type: String
-      Description: The password of the admin use rneeded to make internal API calls
+      Description: The password of the admin user needed to make internal API calls
       NoEcho: True
     BambooAMIID:
       Type: String
@@ -49,9 +49,9 @@
   Mappings:
     ami:
       us-east-1:
-        id: ami-06d30173e755f2475
+        id: ami-0a4931cd7fb89bba3
       eu-west-1:
-        id: ami-08e29c0f9c6c1d628
+        id: ami-01924feb0e4b6fc90
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
