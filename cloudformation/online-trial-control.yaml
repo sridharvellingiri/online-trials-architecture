@@ -51,7 +51,7 @@
       Type: String
       Description: The ARN of the certificate to use when creating a custom domain name for the API gateway
       MinLength: 83
-      Default: arn:aws:acm:us-east-1:179276412545:certificate/4f68e66a-9e6a-45e2-9945-ac880e6a21df
+      Default: arn:aws:acm:us-east-1:179276412545:certificate/0a6473f1-a525-4bbb-92bd-553e7c5a3303
     APIDomainName:
       Type: String
       Description: The API Domain name to use IF this template is being created by Bamboo
