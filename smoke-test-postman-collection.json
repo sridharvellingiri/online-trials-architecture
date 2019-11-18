@@ -1,0 +1,1047 @@
+{
+	"info": {
+		"_postman_id": "4912520e-7d9b-4380-8bc3-93e0fd3fd7b6",
+		"name": "Online Trial Smoke Test",
+		"description": "Set of requests that smoke tests an online trial instance.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "ADW reachability test",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "007fe305-6cff-4b0f-ab8c-9aebed0bfee8",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is HTML",
+							"pm.test(\"Content-Type is HTML\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"text/html\");",
+							"});",
+							"",
+							"// check the marketing tracker is present",
+							"pm.test(\"Marketing tracking is present\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"https://www.googletagmanager.com/gtm.js\");",
+							"    pm.expect(pm.response.text()).to.include(\"GTM-W4HV22\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{trialHost}}",
+					"host": [
+						"{{trialHost}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Share reachability test",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "007fe305-6cff-4b0f-ab8c-9aebed0bfee8",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is HTML",
+							"pm.test(\"Content-Type is HTML\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"text/html;charset=utf-8\");",
+							"});",
+							"",
+							"// check the marketing tracker is present",
+							"pm.test(\"Marketing tracking is present\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"https://www.googletagmanager.com/gtm.js\");",
+							"    pm.expect(pm.response.text()).to.include(\"GTM-W4HV22\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{trialHost}}/share",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"share"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Alfresco reachability test",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "007fe305-6cff-4b0f-ab8c-9aebed0bfee8",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is HTML",
+							"pm.test(\"Content-Type is HTML\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"text/html;charset=ISO-8859-1\");",
+							"});",
+							"",
+							"// check the expected content is present",
+							"pm.test(\"Expected content is present\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"<h1>Welcome to Alfresco</h1>\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "be4f1431-1003-44db-a00f-ba036914d5a4",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{trialHost}}/alfresco",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create trial user",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							"// TODO: see if we can use the built-in random functions to generate data below",
+							"",
+							"pm.environment.set(\"trialUsername\", \"trial\");",
+							"pm.environment.set(\"trialEmail\", \"trial-user@example.com\");",
+							"pm.environment.set(\"trialPassword\", \"trialPassword123\");"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json();",
+							"",
+							"pm.test(\"userName is correct\", function () {",
+							"    pm.expect(jsonData.userName).to.eql(pm.environment.get(\"trialUsername\"));",
+							"});",
+							"",
+							"pm.test(\"email is correct\", function () {",
+							"    pm.expect(jsonData.email).to.eql(pm.environment.get(\"trialEmail\"));",
+							"});",
+							"",
+							"pm.test(\"name is correct\", function () {",
+							"    pm.expect(jsonData.firstName).to.eql(\"Trial\");",
+							"    pm.expect(jsonData.lastName).to.eql(\"User\");",
+							"});",
+							"",
+							"pm.test(\"user is an administrator\", function () {",
+							"    pm.expect(jsonData.isAdminAuthority).to.be.true;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{adminPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{adminUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n   \"userName\": \"{{trialUsername}}\",\n   \"firstName\": \"Trial\",\n   \"lastName\": \"User\",\n   \"email\": \"{{trialEmail}}\",\n   \"password\": \"{{trialPassword}}\",\n   \"groups\": [\"GROUP_ALFRESCO_ADMINISTRATORS\"]\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/service/api/people",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"service",
+						"api",
+						"people"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Add trial user to site",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check role",
+							"pm.test(\"role is correct\", function () {",
+							"    pm.expect(jsonData.role).to.eql(\"SiteManager\");",
+							"});",
+							"",
+							"var personObject = jsonData.person;",
+							"",
+							"// check person details",
+							"pm.test(\"name is correct\", function () {",
+							"    pm.expect(personObject.firstName).to.eql(\"Trial\");",
+							"    pm.expect(personObject.lastName).to.eql(\"User\");",
+							"});",
+							"",
+							"pm.test(\"email is correct\", function () {",
+							"    pm.expect(personObject.email).to.eql(pm.environment.get(\"trialEmail\"));",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{adminPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{adminUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"id\": \"{{trialUsername}}\",\n\t\"role\": \"SiteManager\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/sites/swsdp/members",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"alfresco",
+						"versions",
+						"1",
+						"sites",
+						"swsdp",
+						"members"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Find doclib folder id",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check an id property is present",
+							"pm.test(\"id property is present\", function () {",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"});",
+							"",
+							"// remember the doc lib folder id",
+							"pm.environment.set(\"docLibFolderId\", jsonData.id);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/sites/swsdp/containers/documentLibrary",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"alfresco",
+						"versions",
+						"1",
+						"sites",
+						"swsdp",
+						"containers",
+						"documentLibrary"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create folder",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check a folder was created",
+							"pm.test(\"created node is a folder\", function () {",
+							"    pm.expect(jsonData.isFolder).to.be.true;",
+							"    pm.expect(jsonData.isFile).to.be.false;",
+							"});",
+							"",
+							"// check an id property is present",
+							"pm.test(\"id property is present\", function () {",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"});",
+							"",
+							"// remember the new folder id",
+							"pm.environment.set(\"newFolderId\", jsonData.id);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Notes\",\n    \"nodeType\": \"cm:folder\",\n    \"properties\": {\n        \"cm:title\": \"Notes\",\n        \"cm:description\": \"This folder holds notes for the project\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{{docLibFolderId}}/children",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"alfresco",
+						"versions",
+						"1",
+						"nodes",
+						"{{docLibFolderId}}",
+						"children"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create note",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check a file was created",
+							"pm.test(\"created node is a file\", function () {",
+							"    pm.expect(jsonData.isFile).to.be.true;",
+							"    pm.expect(jsonData.isFolder).to.be.false;",
+							"});",
+							"",
+							"// check an id property is present",
+							"pm.test(\"id property is present\", function () {",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"});",
+							"",
+							"// check name is correct",
+							"pm.test(\"name is correct\", function () {",
+							"    pm.expect(jsonData.name).to.eql(\"note.txt\");",
+							"});",
+							"",
+							"// check mime type is correct",
+							"pm.test(\"mimetype is correct\", function () {",
+							"    pm.expect(jsonData.content.mimeType).to.eql(\"text/plain\");",
+							"    pm.expect(jsonData.content.mimeTypeName).to.eql(\"Plain Text\");",
+							"});",
+							"",
+							"// check author is correct",
+							"pm.test(\"author is correct\", function () {",
+							"    pm.expect(jsonData.properties[\"cm:author\"]).to.eql(pm.environment.get(\"trialUsername\"));",
+							"});",
+							"",
+							"// remember the new note id",
+							"pm.environment.set(\"newNoteId\", jsonData.id);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"note.txt\",\n    \"nodeType\": \"cm:content\",\n    \"properties\": {\n        \"cm:author\": \"{{trialUsername}}\"\n    }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{{newFolderId}}/children",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"alfresco",
+						"versions",
+						"1",
+						"nodes",
+						"{{newFolderId}}",
+						"children"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update note",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"id": "9a89d9fe-1144-403f-aa9a-a92fc9e7853a",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check content size is 34",
+							"pm.test(\"content size is correct\", function () {",
+							"    pm.expect(jsonData.content.sizeInBytes).to.eql(34);",
+							"});",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic dGVzdDp0ZXN0"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "This is some content for the note."
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{{newNoteId}}/content",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"alfresco",
+						"versions",
+						"1",
+						"nodes",
+						"{{newNoteId}}",
+						"content"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create pdf rendition",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 202\", function () {",
+							"    pm.response.to.have.status(202);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": \"pdf\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{{newNoteId}}/renditions",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"alfresco",
+						"versions",
+						"1",
+						"nodes",
+						"{{newNoteId}}",
+						"renditions"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Retrieve pdf preview",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							"// wait 15 seconds before executing request to allow time for the rendition to be created",
+							"console.log(\"waiting 15 seconds for rendition to create...\");",
+							"setTimeout(function() {",
+							"    // do nothing",
+							"    }, 15000);"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check status is CREATED",
+							"pm.test(\"status is correct\", function () {",
+							"    pm.expect(jsonData.status).to.eql(\"CREATED\");",
+							"});",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": \"doclib\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{{newNoteId}}/renditions/pdf",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"alfresco",
+						"versions",
+						"1",
+						"nodes",
+						"{{newNoteId}}",
+						"renditions",
+						"pdf"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Search",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json();",
+							"",
+							"// check we get results",
+							"pm.test(\"there are search results\", function () {",
+							"    pm.expect(jsonData.list.pagination.count).to.be.eql(4);",
+							"    pm.expect(jsonData.list.pagination.totalItems).to.be.eql(4);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"query\": {\n    \"query\": \"note\"\n  }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/search/versions/1/search",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"search",
+						"versions",
+						"1",
+						"search"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"protocolProfileBehavior": {}
+}
