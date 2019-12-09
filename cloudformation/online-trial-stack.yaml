@@ -49,9 +49,9 @@
   Mappings:
     ami:
       us-east-1:
-        id: ami-0534ece8840bfbf11
+        id: ami-06b82777b2b1a1ff3
       eu-west-1:
-        id: ami-07476793c5584f4fc
+        id: ami-00fc9dad5d324bcc2
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
@@ -83,7 +83,7 @@
                 owner: root
                 group: root
       Properties:
-        IamInstanceProfile: aws-opsworks-ec2-role
+        IamInstanceProfile: aws-opsworks-ssm-ec2-role
         ImageId: !If [UseBambooAmi, !Ref BambooAMIID, !FindInMap [ami, !Ref "AWS::Region", id]]
         InstanceType: !Ref TrialInstanceType
         KeyName: online-trial
@@ -123,6 +123,8 @@
                   sed -i s,@@EXTERNAL_PROTOCOL@@,https,g /opt/alfresco/docker-compose/docker-compose.yml
                   sed -i s,@@EXTERNAL_HOST@@,${TrialRoute53DomainNameGenCustomResource.DomainName}.trial.alfresco.com,g /opt/alfresco/docker-compose/docker-compose.yml
                   sed -i s,@@EXTERNAL_PORT@@,443,g /opt/alfresco/docker-compose/docker-compose.yml
+                  sed -i s,@@HOST_NAME@@,${TrialRoute53DomainNameGenCustomResource.DomainName},g /opt/alfresco/docker-compose/docker-compose.yml
+                  sed -i s,@@AWS_REGION@@,${AWS::Region},g /opt/alfresco/docker-compose/docker-compose.yml
                   echo "Registering instance with OpsWorks stack..."
                   aws opsworks register --stack-id $OPSWORKS_STACKID --infrastructure-class ec2 --region us-east-1 --override-hostname ${TrialRoute53DomainNameGenCustomResource.DomainName} --local --use-instance-profile
                   RESULT=$?
