@@ -49,9 +49,9 @@
   Mappings:
     ami:
       us-east-1:
-        id: ami-0135565b736c039fe
+        id: ami-0534ece8840bfbf11
       eu-west-1:
-        id: ami-0231c50efe49cde24
+        id: ami-07476793c5584f4fc
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
