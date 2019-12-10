@@ -888,9 +888,6 @@
 					}
 				}
 			],
-			"protocolProfileBehavior": {
-				"disableBodyPruning": true
-			},
 			"request": {
 				"auth": {
 					"type": "basic",
@@ -916,15 +913,6 @@
 						"value": "application/json"
 					}
 				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"id\": \"doclib\"\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
 				"url": {
 					"raw": "{{trialHost}}/alfresco/api/-default-/public/alfresco/versions/1/nodes/{{newNoteId}}/renditions/pdf",
 					"host": [
@@ -981,8 +969,8 @@
 							"",
 							"// check we get results",
 							"pm.test(\"there are search results\", function () {",
-							"    pm.expect(jsonData.list.pagination.count).to.be.eql(4);",
-							"    pm.expect(jsonData.list.pagination.totalItems).to.be.eql(4);",
+							"    pm.expect(jsonData.list.pagination.count).to.be.above(3);",
+							"    pm.expect(jsonData.list.pagination.totalItems).to.be.above(3);",
 							"});"
 						],
 						"type": "text/javascript"
@@ -1037,6 +1025,282 @@
 						"versions",
 						"1",
 						"search"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create RM site",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json();",
+							"",
+							"// check the response",
+							"// pm.test(\"there are search results\", function () {",
+							"//     pm.expect(jsonData.list.pagination.count).to.be.eql(4);",
+							"//     pm.expect(jsonData.list.pagination.totalItems).to.be.eql(4);",
+							"// });"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"title\": \"Records Management\",\n\t\"description\": \"Records Management Site\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/gs/versions/1/gs-sites",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"gs",
+						"versions",
+						"1",
+						"gs-sites"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Declare note as a record",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 201\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check an id property is present",
+							"pm.test(\"id property is present\", function () {",
+							"    pm.expect(jsonData).to.have.property('id');",
+							"});",
+							"",
+							"// remember the record id",
+							"pm.environment.set(\"recordId\", jsonData.id);",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/gs/versions/1/files/{{newNoteId}}/declare",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"gs",
+						"versions",
+						"1",
+						"files",
+						"{{newNoteId}}",
+						"declare"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Retrieve unfiled records",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "82e7c942-0a87-47af-b3dc-de41dbaafc33",
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "d6b97cf8-d0da-44d1-ae6d-7124239c4763",
+						"exec": [
+							"// check for successful response",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"// check content type is JSON",
+							"pm.test(\"Content-Type is JSON\", function () {",
+							"    pm.response.to.have.header(\"Content-Type\");",
+							"    pm.response.to.be.header(\"Content-Type\", \"application/json;charset=UTF-8\");",
+							"});",
+							"",
+							"// get the response as a JSON object",
+							"var jsonData = pm.response.json().entry;",
+							"",
+							"// check expected AGS properties are present",
+							"pm.test(\"expected properties are present\", function () {",
+							"    pm.expect(jsonData.properties).to.have.property(\"rma:recordOriginatingLocation\");",
+							"    pm.expect(jsonData.properties).to.have.property(\"rma:rootNodeRef\");",
+							"    pm.expect(jsonData.properties).to.have.property(\"rma:recordOriginatingUserId\");",
+							"    pm.expect(jsonData.properties).to.have.property(\"rma:identifier\");",
+							"});",
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"auth": {
+					"type": "basic",
+					"basic": [
+						{
+							"key": "password",
+							"value": "{{trialPassword}}",
+							"type": "string"
+						},
+						{
+							"key": "username",
+							"value": "{{trialUsername}}",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"url": {
+					"raw": "{{trialHost}}/alfresco/api/-default-/public/gs/versions/1/records/{{recordId}}",
+					"host": [
+						"{{trialHost}}"
+					],
+					"path": [
+						"alfresco",
+						"api",
+						"-default-",
+						"public",
+						"gs",
+						"versions",
+						"1",
+						"records",
+						"{{recordId}}"
 					]
 				}
 			},
