@@ -49,12 +49,17 @@
   Mappings:
     ami:
       us-east-1:
-        id: ami-06b82777b2b1a1ff3
+        id: ami-0be749d3ed81aeeb8
       eu-west-1:
-        id: ami-00fc9dad5d324bcc2
+        id: ami-06d285f01422a297c
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
+    LogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: !Sub "/alfresco/online-trial/acs/${TrialRoute53DomainNameGenCustomResource.DomainName}"
+        RetentionInDays: 30
     TrialRoute53DomainNameGenCustomResource:
       Type: Custom::DomainName
       Properties:
@@ -67,6 +72,8 @@
           Fn::ImportValue: !Sub "${ControlArchitectureName}-SubnetAllocator"
     TrialEc2Instance:
       Type: AWS::EC2::Instance
+      DependsOn: 
+        - LogGroup
       CreationPolicy:
         ResourceSignal:
           Timeout: PT45M
