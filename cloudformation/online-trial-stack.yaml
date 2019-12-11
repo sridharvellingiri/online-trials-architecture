@@ -55,11 +55,6 @@
   Conditions:
     UseBambooAmi: !Not [!Equals [!Ref BambooAMIID, BuildMe]]
   Resources:
-    LogGroup:
-      Type: AWS::Logs::LogGroup
-      Properties:
-        LogGroupName: !Sub "/alfresco/online-trial/acs/${TrialRoute53DomainNameGenCustomResource.DomainName}"
-        RetentionInDays: 30
     TrialRoute53DomainNameGenCustomResource:
       Type: Custom::DomainName
       Properties:
@@ -70,6 +65,31 @@
       Properties:
         ServiceToken:
           Fn::ImportValue: !Sub "${ControlArchitectureName}-SubnetAllocator"
+    LogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: !Sub "/alfresco/online-trial/acs/${TrialRoute53DomainNameGenCustomResource.DomainName}"
+        RetentionInDays: 30
+    LogErrorCountMetricFilter:
+      Type: AWS::Logs::MetricFilter
+      Properties:
+        LogGroupName: !Ref LogGroup
+        FilterPattern: ERROR
+        MetricTransformations:
+          - MetricName: !Sub "${TrialRoute53DomainNameGenCustomResource.DomainName}-log-error-count"
+            MetricNamespace: alfresco/online-trial/acs
+            MetricValue: "1"
+            DefaultValue: 0
+    5xxErrorCountMetricFilter:
+      Type: AWS::Logs::MetricFilter
+      Properties:
+        LogGroupName: !Ref LogGroup
+        FilterPattern: "[ip, user, username, timestamp, request, status_code=5*, bytes, referrer, user_agent, unknown]"
+        MetricTransformations:
+          - MetricName: !Sub "${TrialRoute53DomainNameGenCustomResource.DomainName}-5xx-error-count"
+            MetricNamespace: alfresco/online-trial/acs
+            MetricValue: "1"
+            DefaultValue: 0
     TrialEc2Instance:
       Type: AWS::EC2::Instance
       DependsOn: 
